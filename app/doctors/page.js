@@ -14,26 +14,28 @@ const [specialty,setSpecialty] = useState("")
 const [city,setCity] = useState("")
 const [availability,setAvailability] = useState("")
 
+const [page,setPage] = useState(1)
+const pageSize = 10
+
+const [total,setTotal] = useState(0)
+
 useEffect(()=>{
 fetchSpecialties()
-fetchDoctors()
 },[])
 
 useEffect(()=>{
 fetchDoctors()
-},[search,specialty,city,availability])
+},[search,specialty,city,availability,page])
 
 
 async function fetchSpecialties(){
 
-const {data,error} = await supabase
+const {data} = await supabase
 .from("specialties")
-.select("id,name")
+.select("*")
 .order("name")
 
-if(!error){
-setSpecialties(data)
-}
+setSpecialties(data || [])
 
 }
 
@@ -51,8 +53,9 @@ phone,
 availability_status,
 specialty_id,
 specialties(name)
-`)
+`,{count:"exact"})
 .order("created_at",{ascending:false})
+.range((page-1)*pageSize,(page*pageSize)-1)
 
 
 if(search){
@@ -71,55 +74,21 @@ if(availability){
 query = query.eq("availability_status",availability)
 }
 
-const {data,error} = await query
+const {data,count} = await query
 
-
-if(!error){
-setDoctors(data)
-}
+setDoctors(data || [])
+setTotal(count || 0)
 
 }
 
-
-function getStatusColor(status){
-
-if(status==="available") return "#16a34a"
-if(status==="not_available") return "#ef4444"
-if(status==="in_process") return "#f59e0b"
-
-return "#64748b"
-
-}
-
-
-async function shortlistDoctor(doctorId){
-
-const requirementId = prompt("Enter Requirement ID")
-
-if(!requirementId) return
-
-const {error} = await supabase
-.from("shortlists")
-.insert({
-doctor_id:doctorId,
-requirement_id:requirementId,
-status:"shortlisted"
-})
-
-if(error){
-alert("Error shortlisting doctor")
-}else{
-alert("Doctor shortlisted")
-}
-
-}
+const totalPages = Math.ceil(total / pageSize)
 
 
 return(
 
-<div style={{color:"#0f172a"}}>
+<div style={{padding:"30px",color:"#0f172a"}}>
 
-{/* HEADER */}
+{/* Header */}
 
 <div style={{
 display:"flex",
@@ -131,91 +100,60 @@ marginBottom:"25px"
 <h2>Doctors</h2>
 
 <Link href="/doctors/add">
-
 <button style={{
-padding:"10px 16px",
+padding:"10px 18px",
 background:"#2563eb",
 color:"#fff",
 border:"none",
-borderRadius:"6px",
-cursor:"pointer"
+borderRadius:"6px"
 }}>
-
 + Add Doctor
-
 </button>
-
 </Link>
 
 </div>
 
 
-{/* FILTER BAR */}
+{/* Filters */}
 
 <div style={{
 display:"flex",
 gap:"10px",
-marginBottom:"20px",
-flexWrap:"wrap"
+marginBottom:"20px"
 }}>
 
 <input
 placeholder="Search name or phone"
 value={search}
 onChange={(e)=>setSearch(e.target.value)}
-style={{
-padding:"8px 12px",
-border:"1px solid #ddd",
-borderRadius:"6px",
-background:"#fff"
-}}
+style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 />
-
 
 <select
 value={specialty}
 onChange={(e)=>setSpecialty(e.target.value)}
-style={{
-padding:"8px 12px",
-border:"1px solid #ddd",
-borderRadius:"6px",
-background:"#fff"
-}}
+style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 >
 
 <option value="">All Specialties</option>
 
 {specialties.map(s=>(
-<option key={s.id} value={s.id}>
-{s.name}
-</option>
+<option key={s.id} value={s.id}>{s.name}</option>
 ))}
 
 </select>
-
 
 <input
 placeholder="City"
 value={city}
 onChange={(e)=>setCity(e.target.value)}
-style={{
-padding:"8px 12px",
-border:"1px solid #ddd",
-borderRadius:"6px",
-background:"#fff"
-}}
+style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 />
-
 
 <select
 value={availability}
 onChange={(e)=>setAvailability(e.target.value)}
-style={{
-padding:"8px 12px",
-border:"1px solid #ddd",
-borderRadius:"6px",
-background:"#fff"
-}}
+style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 >
 
 <option value="">Availability</option>
@@ -228,54 +166,37 @@ background:"#fff"
 </div>
 
 
-{/* DOCTORS TABLE */}
+{/* Table */}
 
-<div style={{
-background:"#fff",
-border:"1px solid #e5e7eb",
-borderRadius:"8px",
-overflow:"hidden"
-}}>
+<div style={{border:"1px solid #eee",borderRadius:"8px"}}>
 
-<table width="100%" cellPadding="12" style={{borderCollapse:"collapse"}}>
+<table width="100%" cellPadding="12">
 
-<thead style={{
-background:"#f8fafc",
-fontWeight:"600"
-}}>
+<thead style={{background:"#f8fafc"}}>
 
 <tr>
 
-<th align="left">Name</th>
-<th align="left">Specialty</th>
-<th align="left">Experience</th>
-<th align="left">City</th>
-<th align="left">Availability</th>
-<th align="left">Phone</th>
-<th align="left">Actions</th>
+<th>Name</th>
+<th>Specialty</th>
+<th>Experience</th>
+<th>City</th>
+<th>Availability</th>
+<th>Phone</th>
+<th>Actions</th>
 
 </tr>
 
 </thead>
 
-
 <tbody>
 
 {doctors.map(d=>(
 
-<tr
-key={d.id}
-style={{
-borderTop:"1px solid #e5e7eb"
-}}
->
+<tr key={d.id} style={{borderTop:"1px solid #eee"}}>
 
 <td>{d.name}</td>
-
 <td>{d.specialties?.name}</td>
-
 <td>{d.experience_years} yrs</td>
-
 <td>{d.city}</td>
 
 <td>
@@ -283,9 +204,8 @@ borderTop:"1px solid #e5e7eb"
 <span style={{
 padding:"4px 10px",
 borderRadius:"20px",
-fontSize:"12px",
-color:"#fff",
-background:getStatusColor(d.availability_status)
+background:"#e0f2fe",
+fontSize:"12px"
 }}>
 {d.availability_status}
 </span>
@@ -299,28 +219,12 @@ background:getStatusColor(d.availability_status)
 <a
 href={`https://wa.me/91${d.phone}`}
 target="_blank"
-style={{marginRight:"10px",textDecoration:"none"}}
+style={{marginRight:"10px"}}
 >
 💬
 </a>
 
-<Link
-href={`/doctors/${d.id}`}
-style={{marginRight:"10px"}}
->
-👁
-</Link>
-
-<button
-onClick={()=>shortlistDoctor(d.id)}
-style={{
-border:"none",
-background:"transparent",
-cursor:"pointer"
-}}
->
-⭐
-</button>
+<Link href={`/doctors/${d.id}`}>👁</Link>
 
 </td>
 
@@ -331,6 +235,41 @@ cursor:"pointer"
 </tbody>
 
 </table>
+
+</div>
+
+
+{/* Pagination */}
+
+<div style={{
+marginTop:"20px",
+display:"flex",
+gap:"6px"
+}}>
+
+{Array.from({length:totalPages}).map((_,i)=>{
+
+const p=i+1
+
+return(
+
+<button
+key={p}
+onClick={()=>setPage(p)}
+style={{
+padding:"6px 10px",
+border:"1px solid #ddd",
+borderRadius:"6px",
+background:page===p?"#2563eb":"#fff",
+color:page===p?"#fff":"#000"
+}}
+>
+{p}
+</button>
+
+)
+
+})}
 
 </div>
 
