@@ -7,13 +7,14 @@ import Link from "next/link"
 export default function RequirementsPage(){
 
 const [requirements,setRequirements] = useState([])
-const [doctors,setDoctors] = useState([])
+const [search,setSearch] = useState("")
+
+const [page,setPage] = useState(1)
+const pageSize = 10
 
 useEffect(()=>{
 loadRequirements()
-loadDoctors()
 },[])
-
 
 async function loadRequirements(){
 
@@ -21,11 +22,10 @@ const {data,error} = await supabase
 .from("requirements")
 .select(`
 id,
-specialty_id,
+city,
 experience_required,
 salary_min,
 salary_max,
-city,
 positions,
 priority,
 status,
@@ -34,69 +34,32 @@ specialties(name)
 `)
 .order("created_at",{ascending:false})
 
-if(error){
-console.log(error)
-return
-}
-
+if(!error){
 setRequirements(data || [])
+}
 
 }
 
 
-async function loadDoctors(){
+const filtered = requirements.filter(r => {
 
-const {data,error} = await supabase
-.from("doctors")
-.select(`
-id,
-specialty_id,
-experience_years,
-city
-`)
+const hospital = r.hospitals?.hospital_name?.toLowerCase() || ""
+const specialty = r.specialties?.name?.toLowerCase() || ""
+const city = r.city?.toLowerCase() || ""
 
-if(error){
-console.log(error)
-return
-}
-
-setDoctors(data || [])
-
-}
-
-
-function countMatches(requirement){
-
-const matches = doctors.filter(d =>
-d.specialty_id === requirement.specialty_id &&
-d.experience_years >= requirement.experience_required &&
-d.city?.toLowerCase() === requirement.city?.toLowerCase()
+return (
+hospital.includes(search.toLowerCase()) ||
+specialty.includes(search.toLowerCase()) ||
+city.includes(search.toLowerCase())
 )
 
-return matches.length
-
-}
+})
 
 
-function priorityColor(priority){
+const totalPages = Math.ceil(filtered.length / pageSize)
 
-if(priority==="urgent") return "#ef4444"
-if(priority==="normal") return "#f59e0b"
-if(priority==="low") return "#16a34a"
-
-return "#64748b"
-
-}
-
-
-function matchColor(count){
-
-if(count === 0) return "#ef4444"
-if(count <= 2) return "#f59e0b"
-
-return "#16a34a"
-
-}
+const start = (page - 1) * pageSize
+const paginated = filtered.slice(start,start + pageSize)
 
 
 return(
@@ -115,27 +78,47 @@ marginBottom:"20px"
 <h2>Hospital Requirements</h2>
 
 <Link href="/requirements/add">
-
 <button style={{
-padding:"10px 16px",
+padding:"8px 16px",
 background:"#2563eb",
 color:"#fff",
 border:"none",
-borderRadius:"6px",
-cursor:"pointer"
+borderRadius:"6px"
 }}>
 + Add Requirement
 </button>
-
 </Link>
 
 </div>
 
 
-{/* Requirements Table */}
+{/* Search */}
+
+<div style={{marginBottom:"20px"}}>
+
+<input
+placeholder="Search hospital, specialty or city..."
+value={search}
+onChange={(e)=>{
+
+setSearch(e.target.value)
+setPage(1)
+
+}}
+style={{
+width:"350px",
+padding:"8px",
+border:"1px solid #ddd",
+borderRadius:"6px"
+}}
+/>
+
+</div>
+
+
+{/* Table */}
 
 <div style={{
-background:"#fff",
 border:"1px solid #e5e7eb",
 borderRadius:"8px",
 overflow:"hidden"
@@ -162,13 +145,9 @@ overflow:"hidden"
 
 <tbody>
 
-{requirements.map(r=>{
+{paginated.map(r=>(
 
-const matches = countMatches(r)
-
-return(
-
-<tr key={r.id} style={{borderTop:"1px solid #e5e7eb"}}>
+<tr key={r.id} style={{borderTop:"1px solid #eee"}}>
 
 <td>{r.hospitals?.hospital_name}</td>
 
@@ -179,7 +158,7 @@ return(
 <td>{r.experience_required} yrs</td>
 
 <td>
-₹{r.salary_min} - ₹{r.salary_max}
+₹{r.salary_min?.toLocaleString()} - ₹{r.salary_max?.toLocaleString()}
 </td>
 
 <td>{r.positions}</td>
@@ -190,10 +169,12 @@ return(
 padding:"4px 10px",
 borderRadius:"20px",
 fontSize:"12px",
-color:"#fff",
-background:priorityColor(r.priority)
+background: r.priority==="urgent" ? "#ef4444" : "#f59e0b",
+color:"#fff"
 }}>
+
 {r.priority}
+
 </span>
 
 </td>
@@ -203,15 +184,15 @@ background:priorityColor(r.priority)
 <Link href={`/requirements/${r.id}/matches`}>
 
 <span style={{
-padding:"4px 10px",
+background:"#ef4444",
+color:"#fff",
+padding:"6px 12px",
 borderRadius:"20px",
 fontSize:"12px",
-color:"#fff",
-background:matchColor(matches),
 cursor:"pointer"
 }}>
 
-{matches} Matches
+Matches
 
 </span>
 
@@ -221,13 +202,46 @@ cursor:"pointer"
 
 </tr>
 
-)
-
-})}
+))}
 
 </tbody>
 
 </table>
+
+</div>
+
+
+{/* Pagination */}
+
+<div style={{
+display:"flex",
+gap:"8px",
+marginTop:"20px"
+}}>
+
+{Array.from({length: totalPages}).map((_,i)=>{
+
+const p = i + 1
+
+return(
+
+<button
+key={p}
+onClick={()=>setPage(p)}
+style={{
+padding:"6px 10px",
+borderRadius:"6px",
+border:"1px solid #ddd",
+background: page===p ? "#2563eb" : "#fff",
+color: page===p ? "#fff" : "#000"
+}}
+>
+{p}
+</button>
+
+)
+
+})}
 
 </div>
 
