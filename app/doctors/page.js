@@ -15,7 +15,7 @@ const [city,setCity] = useState("")
 const [availability,setAvailability] = useState("")
 
 const [page,setPage] = useState(1)
-const pageSize = 10
+const pageSize = 20
 
 const [total,setTotal] = useState(0)
 
