@@ -51,22 +51,31 @@ alert("Please select specialty")
 return
 }
 
-const doctorData = {
-name: name || null,
-specialty_id: specialty ? Number(specialty) : null,
-experience_years: experience ? Number(experience) : null,
-phone: phone || null,
-email: email || null,
-city: city || null,
-expected_ctc: expectedCTC ? Number(expectedCTC) : null,
-availability_status: availability || "available",
-qualification: qualification || null,
-remarks: remarks || null
-}
-
-const { error } = await supabase
+const {error} = await supabase
 .from("doctors")
-.insert([doctorData])
+.insert({
+
+name:name,
+
+specialty_id: specialty ? Number(specialty) : null,
+
+experience_years: experience ? Number(experience) : null,
+
+phone: phone || null,
+
+email: email || null,
+
+city: city || null,
+
+expected_ctc: expectedCTC ? Number(expectedCTC) : null,
+
+availability_status: availability || "available",
+
+qualification: qualification || null,
+
+remarks: remarks || null
+
+})
 
 if(error){
 console.log(error)
