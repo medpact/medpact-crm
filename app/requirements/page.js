@@ -8,13 +8,14 @@ export default function RequirementsPage(){
 
 const [requirements,setRequirements] = useState([])
 const [search,setSearch] = useState("")
-
 const [page,setPage] = useState(1)
+
 const pageSize = 10
 
 useEffect(()=>{
 loadRequirements()
 },[])
+
 
 async function loadRequirements(){
 
@@ -29,14 +30,45 @@ salary_max,
 positions,
 priority,
 status,
+specialty_id,
 hospitals(hospital_name),
 specialties(name)
 `)
 .order("created_at",{ascending:false})
 
 if(!error){
-setRequirements(data || [])
+
+const withMatches = await addMatchCounts(data || [])
+
+setRequirements(withMatches)
+
 }
+
+}
+
+
+async function addMatchCounts(reqs){
+
+let result = []
+
+for(const r of reqs){
+
+const {count} = await supabase
+.from("doctors")
+.select("*",{count:"exact",head:true})
+.eq("specialty_id",r.specialty_id)
+.ilike("city",`%${r.city}%`)
+.gte("experience_years",r.experience_required || 0)
+.eq("availability_status","available")
+
+result.push({
+...r,
+match_count: count || 0
+})
+
+}
+
+return result
 
 }
 
@@ -47,7 +79,7 @@ const hospital = r.hospitals?.hospital_name?.toLowerCase() || ""
 const specialty = r.specialties?.name?.toLowerCase() || ""
 const city = r.city?.toLowerCase() || ""
 
-return (
+return(
 hospital.includes(search.toLowerCase()) ||
 specialty.includes(search.toLowerCase()) ||
 city.includes(search.toLowerCase())
@@ -58,13 +90,15 @@ city.includes(search.toLowerCase())
 
 const totalPages = Math.ceil(filtered.length / pageSize)
 
-const start = (page - 1) * pageSize
+const start = (page-1) * pageSize
 const paginated = filtered.slice(start,start + pageSize)
+
 
 
 return(
 
 <div style={{color:"#0f172a"}}>
+
 
 {/* Header */}
 
@@ -100,10 +134,8 @@ borderRadius:"6px"
 placeholder="Search hospital, specialty or city..."
 value={search}
 onChange={(e)=>{
-
 setSearch(e.target.value)
 setPage(1)
-
 }}
 style={{
 width:"350px",
@@ -172,12 +204,11 @@ fontSize:"12px",
 background: r.priority==="urgent" ? "#ef4444" : "#f59e0b",
 color:"#fff"
 }}>
-
 {r.priority}
-
 </span>
 
 </td>
+
 
 <td>
 
@@ -192,13 +223,14 @@ fontSize:"12px",
 cursor:"pointer"
 }}>
 
-Matches
+{r.match_count} Matches
 
 </span>
 
 </Link>
 
 </td>
+
 
 </tr>
 
@@ -221,7 +253,7 @@ marginTop:"20px"
 
 {Array.from({length: totalPages}).map((_,i)=>{
 
-const p = i + 1
+const p = i+1
 
 return(
 
@@ -244,6 +276,7 @@ color: page===p ? "#fff" : "#000"
 })}
 
 </div>
+
 
 </div>
 
