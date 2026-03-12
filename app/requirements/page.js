@@ -10,7 +10,10 @@ const [requirements,setRequirements] = useState([])
 const [search,setSearch] = useState("")
 const [page,setPage] = useState(1)
 
-const pageSize = 10
+const [sortMatches,setSortMatches] = useState("desc")
+
+const pageSize = 20
+
 
 useEffect(()=>{
 loadRequirements()
@@ -49,7 +52,7 @@ setRequirements(withMatches)
 
 async function addMatchCounts(reqs){
 
-let result = []
+let result=[]
 
 for(const r of reqs){
 
@@ -63,7 +66,7 @@ const {count} = await supabase
 
 result.push({
 ...r,
-match_count: count || 0
+match_count:count || 0
 })
 
 }
@@ -73,7 +76,7 @@ return result
 }
 
 
-const filtered = requirements.filter(r => {
+const filtered = requirements.filter(r=>{
 
 const hospital = r.hospitals?.hospital_name?.toLowerCase() || ""
 const specialty = r.specialties?.name?.toLowerCase() || ""
@@ -88,10 +91,24 @@ city.includes(search.toLowerCase())
 })
 
 
-const totalPages = Math.ceil(filtered.length / pageSize)
 
-const start = (page-1) * pageSize
-const paginated = filtered.slice(start,start + pageSize)
+/* SORT BY MATCHES */
+
+const sorted = [...filtered].sort((a,b)=>{
+
+if(sortMatches==="desc"){
+return b.match_count - a.match_count
+}else{
+return a.match_count - b.match_count
+}
+
+})
+
+
+const totalPages = Math.ceil(sorted.length / pageSize)
+
+const start = (page-1)*pageSize
+const paginated = sorted.slice(start,start+pageSize)
 
 
 
@@ -100,7 +117,7 @@ return(
 <div style={{color:"#0f172a"}}>
 
 
-{/* Header */}
+{/* HEADER */}
 
 <div style={{
 display:"flex",
@@ -126,9 +143,14 @@ borderRadius:"6px"
 </div>
 
 
-{/* Search */}
 
-<div style={{marginBottom:"20px"}}>
+{/* SEARCH + SORT */}
+
+<div style={{
+display:"flex",
+gap:"20px",
+marginBottom:"20px"
+}}>
 
 <input
 placeholder="Search hospital, specialty or city..."
@@ -138,17 +160,35 @@ setSearch(e.target.value)
 setPage(1)
 }}
 style={{
-width:"350px",
+width:"320px",
 padding:"8px",
 border:"1px solid #ddd",
 borderRadius:"6px"
 }}
 />
 
+
+<select
+value={sortMatches}
+onChange={(e)=>setSortMatches(e.target.value)}
+style={{
+padding:"8px",
+border:"1px solid #ddd",
+borderRadius:"6px"
+}}
+>
+
+<option value="desc">Sort by Matches (High → Low)</option>
+<option value="asc">Sort by Matches (Low → High)</option>
+
+</select>
+
+
 </div>
 
 
-{/* Table */}
+
+{/* TABLE */}
 
 <div style={{
 border:"1px solid #e5e7eb",
@@ -209,7 +249,6 @@ color:"#fff"
 
 </td>
 
-
 <td>
 
 <Link href={`/requirements/${r.id}/matches`}>
@@ -231,7 +270,6 @@ cursor:"pointer"
 
 </td>
 
-
 </tr>
 
 ))}
@@ -243,7 +281,8 @@ cursor:"pointer"
 </div>
 
 
-{/* Pagination */}
+
+{/* PAGINATION */}
 
 <div style={{
 display:"flex",
