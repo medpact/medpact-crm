@@ -28,18 +28,25 @@ loadSpecialties()
 },[])
 
 
+
 async function loadHospitals(){
 
 const {data,error} = await supabase
 .from("hospitals")
-.select("id,hospital_name")
+.select(`
+id,
+hospital_name,
+city_id,
+cities(name)
+`)
 .order("hospital_name")
 
 if(!error){
-setHospitals(data)
+setHospitals(data || [])
 }
 
 }
+
 
 
 async function loadSpecialties(){
@@ -50,10 +57,11 @@ const {data,error} = await supabase
 .order("name")
 
 if(!error){
-setSpecialties(data)
+setSpecialties(data || [])
 }
 
 }
+
 
 
 async function saveRequirement(){
@@ -71,16 +79,27 @@ return
 const {error} = await supabase
 .from("requirements")
 .insert({
-hospital_id:hospital,
-specialty_id:specialty,
-experience_required:experience,
-salary_min:salaryMin,
-salary_max:salaryMax,
-city:city,
-positions:positions,
-priority:priority,
-status:status,
-notes:notes
+
+hospital_id: hospital ? Number(hospital) : null,
+
+specialty_id: specialty ? Number(specialty) : null,
+
+experience_required: experience ? Number(experience) : null,
+
+salary_min: salaryMin ? Number(salaryMin) : null,
+
+salary_max: salaryMax ? Number(salaryMax) : null,
+
+city: city || null,
+
+positions: positions ? Number(positions) : null,
+
+priority: priority,
+
+status: status,
+
+notes: notes || null
+
 })
 
 if(error){
@@ -94,6 +113,7 @@ alert("Requirement added successfully")
 router.push("/requirements")
 
 }
+
 
 
 return(
@@ -114,6 +134,7 @@ maxWidth:"600px"
 }}>
 
 
+
 {/* Hospital */}
 
 <div style={{marginBottom:"15px"}}>
@@ -122,7 +143,17 @@ maxWidth:"600px"
 
 <select
 value={hospital}
-onChange={(e)=>setHospital(e.target.value)}
+onChange={(e)=>{
+
+setHospital(e.target.value)
+
+const selected = hospitals.find(h => h.id == e.target.value)
+
+if(selected){
+setCity(selected.cities?.name || "")
+}
+
+}}
 style={{
 width:"100%",
 padding:"8px",
@@ -142,6 +173,7 @@ borderRadius:"6px"
 </select>
 
 </div>
+
 
 
 {/* Specialty */}
@@ -174,6 +206,7 @@ borderRadius:"6px"
 </div>
 
 
+
 {/* Experience */}
 
 <div style={{marginBottom:"15px"}}>
@@ -193,6 +226,7 @@ borderRadius:"6px"
 />
 
 </div>
+
 
 
 {/* Salary Min */}
@@ -216,6 +250,7 @@ borderRadius:"6px"
 </div>
 
 
+
 {/* Salary Max */}
 
 <div style={{marginBottom:"15px"}}>
@@ -237,6 +272,7 @@ borderRadius:"6px"
 </div>
 
 
+
 {/* City */}
 
 <div style={{marginBottom:"15px"}}>
@@ -245,16 +281,18 @@ borderRadius:"6px"
 
 <input
 value={city}
-onChange={(e)=>setCity(e.target.value)}
+readOnly
 style={{
 width:"100%",
 padding:"8px",
+background:"#f1f5f9",
 border:"1px solid #ddd",
 borderRadius:"6px"
 }}
 />
 
 </div>
+
 
 
 {/* Positions */}
@@ -276,6 +314,7 @@ borderRadius:"6px"
 />
 
 </div>
+
 
 
 {/* Priority */}
@@ -304,6 +343,7 @@ borderRadius:"6px"
 </div>
 
 
+
 {/* Status */}
 
 <div style={{marginBottom:"15px"}}>
@@ -329,6 +369,7 @@ borderRadius:"6px"
 </div>
 
 
+
 {/* Notes */}
 
 <div style={{marginBottom:"20px"}}>
@@ -347,6 +388,7 @@ borderRadius:"6px"
 />
 
 </div>
+
 
 
 <button
