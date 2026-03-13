@@ -100,7 +100,29 @@ const reason = prompt("Enter rejection reason (Doctor / Hospital):")
 
 if(!reason) return
 
-const {error} = await supabase
+/* get existing doctor remarks */
+
+const {data:doctorData} = await supabase
+.from("doctors")
+.select("remarks")
+.eq("id",row.doctor_id)
+.single()
+
+const hospitalName = row.requirements?.hospitals?.hospital_name || "Unknown Hospital"
+
+const today = new Date().toISOString().split("T")[0]
+
+const newRemark =
+`${today} | ${hospitalName} | ${reason}`
+
+const updatedRemarks = doctorData?.remarks
+? doctorData.remarks + "\n" + newRemark
+: newRemark
+
+
+/* update shortlist status */
+
+await supabase
 .from("shortlists")
 .update({
 status:"rejected",
@@ -108,10 +130,16 @@ remarks:reason
 })
 .eq("id",row.id)
 
-if(error){
-alert("Error rejecting candidate")
-return
-}
+
+/* append remark in doctor profile */
+
+await supabase
+.from("doctors")
+.update({
+remarks:updatedRemarks
+})
+.eq("id",row.doctor_id)
+
 
 fetchShortlists()
 
