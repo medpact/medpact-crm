@@ -271,13 +271,13 @@ overflow:"hidden"
 <tr>
 
 <th width="110">Entry Date</th>
-<th>Hospital</th>
-<th>Specialty</th>
-<th>City</th>
-<th>Experience</th>
-<th>Salary</th>
-<th>Positions</th>
-<th>Priority</th>
+<th align="left">Hospital</th>
+<th align="left">Specialty</th>
+<th align="left">City</th>
+<th align="left">Experience</th>
+<th align="left">Salary</th>
+<th align="left">Positions</th>
+<th align="left">Priority</th>
 <th align="center">Matches</th>
 
 </tr>
