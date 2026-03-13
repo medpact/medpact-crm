@@ -28,43 +28,47 @@ loadSpecialties()
 },[])
 
 
-
 async function loadHospitals(){
 
-const {data,error} = await supabase
+const {data} = await supabase
 .from("hospitals")
-.select(`
-id,
-hospital_name,
-city_id,
-cities(name)
-`)
+.select(`id,hospital_name,city_id,cities(name)`)
 .order("hospital_name")
 
-if(!error){
 setHospitals(data || [])
-}
 
 }
-
 
 
 async function loadSpecialties(){
 
-const {data,error} = await supabase
+const {data} = await supabase
 .from("specialties")
 .select("id,name")
 .order("name")
 
-if(!error){
 setSpecialties(data || [])
-}
 
 }
 
 
 
-async function saveRequirement(){
+function resetForm(){
+
+setSpecialty("")
+setExperience("")
+setSalaryMin("")
+setSalaryMax("")
+setPositions("")
+setPriority("normal")
+setStatus("open")
+setNotes("")
+
+}
+
+
+
+async function saveRequirement(goBack=false){
 
 if(!hospital){
 alert("Please select hospital")
@@ -76,29 +80,23 @@ alert("Please select specialty")
 return
 }
 
+const today = new Date().toISOString().split("T")[0]
+
 const {error} = await supabase
 .from("requirements")
 .insert({
 
-hospital_id: hospital ? Number(hospital) : null,
-
-specialty_id: specialty ? Number(specialty) : null,
-
+hospital_id: Number(hospital),
+specialty_id: Number(specialty),
 experience_required: experience ? Number(experience) : null,
-
 salary_min: salaryMin ? Number(salaryMin) : null,
-
 salary_max: salaryMax ? Number(salaryMax) : null,
-
-city: city || null,
-
+city: city,
 positions: positions ? Number(positions) : null,
-
-priority: priority,
-
-status: status,
-
-notes: notes || null
+priority,
+status,
+notes,
+entry_date: today
 
 })
 
@@ -108,9 +106,13 @@ alert("Error saving requirement")
 return
 }
 
-alert("Requirement added successfully")
+alert("Requirement saved")
 
+if(goBack){
 router.push("/requirements")
+}else{
+resetForm()
+}
 
 }
 
@@ -120,10 +122,7 @@ return(
 
 <div style={{color:"#0f172a"}}>
 
-<h2 style={{marginBottom:"20px"}}>
-Add Requirement
-</h2>
-
+<h2 style={{marginBottom:"20px"}}>Add Requirement</h2>
 
 <div style={{
 background:"#fff",
@@ -132,8 +131,6 @@ borderRadius:"8px",
 padding:"25px",
 maxWidth:"600px"
 }}>
-
-
 
 {/* Hospital */}
 
@@ -154,26 +151,18 @@ setCity(selected.cities?.name || "")
 }
 
 }}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
+style={{width:"100%",padding:"8px"}}
 >
 
 <option value="">Select Hospital</option>
 
 {hospitals.map(h=>(
-<option key={h.id} value={h.id}>
-{h.hospital_name}
-</option>
+<option key={h.id} value={h.id}>{h.hospital_name}</option>
 ))}
 
 </select>
 
 </div>
-
 
 
 {/* Specialty */}
@@ -185,20 +174,13 @@ borderRadius:"6px"
 <select
 value={specialty}
 onChange={(e)=>setSpecialty(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
+style={{width:"100%",padding:"8px"}}
 >
 
 <option value="">Select Specialty</option>
 
 {specialties.map(s=>(
-<option key={s.id} value={s.id}>
-{s.name}
-</option>
+<option key={s.id} value={s.id}>{s.name}</option>
 ))}
 
 </select>
@@ -206,30 +188,23 @@ borderRadius:"6px"
 </div>
 
 
-
 {/* Experience */}
 
 <div style={{marginBottom:"15px"}}>
 
-<label>Experience Required (Years)</label>
+<label>Experience Required</label>
 
 <input
 type="number"
 value={experience}
 onChange={(e)=>setExperience(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
+style={{width:"100%",padding:"8px"}}
 />
 
 </div>
 
 
-
-{/* Salary Min */}
+{/* Salary */}
 
 <div style={{marginBottom:"15px"}}>
 
@@ -239,19 +214,11 @@ borderRadius:"6px"
 type="number"
 value={salaryMin}
 onChange={(e)=>setSalaryMin(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
+style={{width:"100%",padding:"8px"}}
 />
 
 </div>
 
-
-
-{/* Salary Max */}
 
 <div style={{marginBottom:"15px"}}>
 
@@ -261,16 +228,10 @@ borderRadius:"6px"
 type="number"
 value={salaryMax}
 onChange={(e)=>setSalaryMax(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
+style={{width:"100%",padding:"8px"}}
 />
 
 </div>
-
 
 
 {/* City */}
@@ -279,20 +240,9 @@ borderRadius:"6px"
 
 <label>City</label>
 
-<input
-value={city}
-readOnly
-style={{
-width:"100%",
-padding:"8px",
-background:"#f1f5f9",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
-/>
+<input value={city} readOnly style={{width:"100%",padding:"8px",background:"#f1f5f9"}}/>
 
 </div>
-
 
 
 {/* Positions */}
@@ -305,105 +255,43 @@ borderRadius:"6px"
 type="number"
 value={positions}
 onChange={(e)=>setPositions(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
+style={{width:"100%",padding:"8px"}}
 />
 
 </div>
 
 
+{/* Buttons */}
 
-{/* Priority */}
-
-<div style={{marginBottom:"15px"}}>
-
-<label>Priority</label>
-
-<select
-value={priority}
-onChange={(e)=>setPriority(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
->
-
-<option value="urgent">Urgent</option>
-<option value="normal">Normal</option>
-<option value="low">Low</option>
-
-</select>
-
-</div>
-
-
-
-{/* Status */}
-
-<div style={{marginBottom:"15px"}}>
-
-<label>Status</label>
-
-<select
-value={status}
-onChange={(e)=>setStatus(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
->
-
-<option value="open">Open</option>
-<option value="closed">Closed</option>
-
-</select>
-
-</div>
-
-
-
-{/* Notes */}
-
-<div style={{marginBottom:"20px"}}>
-
-<label>Notes</label>
-
-<textarea
-value={notes}
-onChange={(e)=>setNotes(e.target.value)}
-style={{
-width:"100%",
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
-/>
-
-</div>
-
-
+<div style={{display:"flex",gap:"10px"}}>
 
 <button
-onClick={saveRequirement}
+onClick={()=>saveRequirement(false)}
+style={{
+padding:"10px 18px",
+background:"#16a34a",
+color:"#fff",
+border:"none",
+borderRadius:"6px"
+}}
+>
+Save & Add Another
+</button>
+
+<button
+onClick={()=>saveRequirement(true)}
 style={{
 padding:"10px 18px",
 background:"#2563eb",
 color:"#fff",
 border:"none",
-borderRadius:"6px",
-cursor:"pointer"
+borderRadius:"6px"
 }}
 >
-Save Requirement
+Save & Go to Requirements
 </button>
+
+</div>
 
 </div>
 
