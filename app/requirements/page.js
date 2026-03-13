@@ -14,9 +14,27 @@ const [sortMatches,setSortMatches] = useState("desc")
 
 const pageSize = 20
 
+
 useEffect(()=>{
 loadRequirements()
 },[])
+
+
+
+function formatDate(date){
+
+if(!date) return ""
+
+const d = new Date(date)
+
+const day = String(d.getDate()).padStart(2,'0')
+const month = String(d.getMonth()+1).padStart(2,'0')
+const year = String(d.getFullYear()).slice(-2)
+
+return `${day}-${month}-${year}`
+
+}
+
 
 
 async function loadRequirements(){
@@ -28,7 +46,6 @@ id,
 city,
 experience_required,
 salary_min,
-salary_max,
 entry_date,
 positions,
 priority,
@@ -37,7 +54,7 @@ specialty_id,
 hospitals(hospital_name),
 specialties(name)
 `)
-.order("created_at",{ascending:false})
+.order("entry_date",{ascending:false})
 
 if(!error){
 
@@ -48,6 +65,7 @@ setRequirements(withMatches)
 }
 
 }
+
 
 
 async function addMatchCounts(reqs){
@@ -73,6 +91,7 @@ return result
 }
 
 
+
 const filtered = requirements.filter(r=>{
 
 const hospital = r.hospitals?.hospital_name?.toLowerCase() || ""
@@ -88,7 +107,6 @@ city.includes(search.toLowerCase())
 })
 
 
-/* SORT BY MATCHES */
 
 const sorted = [...filtered].sort((a,b)=>{
 
@@ -99,6 +117,7 @@ return a.match_count - b.match_count
 }
 
 })
+
 
 
 const totalPages = Math.ceil(sorted.length / pageSize)
@@ -197,7 +216,8 @@ overflow:"hidden"
 <thead style={{background:"#f8fafc"}}>
 
 <tr>
-<th align="left">Entry date</th>
+
+<th align="left" width="110">Entry Date</th>
 <th align="left">Hospital</th>
 <th align="left">Specialty</th>
 <th align="left">City</th>
@@ -205,7 +225,7 @@ overflow:"hidden"
 <th align="left">Salary</th>
 <th align="left">Positions</th>
 <th align="left">Priority</th>
-<th align="left">Matches</th>
+<th align="center">Matches</th>
 
 </tr>
 
@@ -216,17 +236,21 @@ overflow:"hidden"
 {paginated.map(r=>(
 
 <tr key={r.id} style={{borderTop:"1px solid #eee"}}>
-<td>{r.entry_date}</td>
+
+<td>{formatDate(r.entry_date)}</td>
+
 <td>{r.hospitals?.hospital_name}</td>
 
 <td>{r.specialties?.name}</td>
 
 <td>{r.city}</td>
 
-<td>{r.experience_required} yrs</td>
+<td>{r.experience_required ? `${r.experience_required} yrs` : "-"}</td>
 
 <td>
-₹{r.salary_min?.toLocaleString()} - ₹{r.salary_max?.toLocaleString()}
+
+{r.salary_min ? `~₹${r.salary_min.toLocaleString()}` : "-"}
+
 </td>
 
 <td>{r.positions}</td>
@@ -245,20 +269,21 @@ color:"#fff"
 
 </td>
 
-<td>
+<td align="center">
 
 <Link href={`/requirements/${r.id}/matches`}>
 
 <span style={{
 background:"#ef4444",
 color:"#fff",
-padding:"6px 12px",
+padding:"6px 14px",
 borderRadius:"20px",
 fontSize:"12px",
-cursor:"pointer"
+cursor:"pointer",
+display:"inline-block"
 }}>
 
-{r.match_count} Matches
+{r.match_count}
 
 </span>
 
