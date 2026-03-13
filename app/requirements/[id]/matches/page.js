@@ -24,7 +24,6 @@ const {data,error} = await supabase
 .select(`
 id,
 specialty_id,
-experience_required,
 city,
 salary_min,
 salary_max,
@@ -46,6 +45,7 @@ loadDoctors(data)
 }
 
 
+
 async function loadDoctors(req){
 
 const {data,error} = await supabase
@@ -61,22 +61,16 @@ specialty_id,
 specialties(name)
 `)
 .eq("specialty_id",req.specialty_id)
-.gte("experience_years",req.experience_required)
 
 if(error){
 console.log(error)
 return
 }
 
-/* city filter */
-
-const filtered = data.filter(d =>
-d.city?.toLowerCase() === req.city?.toLowerCase()
-)
-
-setDoctors(filtered)
+setDoctors(data || [])
 
 }
+
 
 
 async function shortlistDoctor(doctorId){
@@ -98,6 +92,7 @@ return
 alert("Doctor shortlisted successfully")
 
 }
+
 
 
 if(!requirement){
@@ -122,6 +117,7 @@ return(
 </Link>
 
 </div>
+
 
 <h2 style={{marginBottom:"20px"}}>
 
@@ -149,14 +145,11 @@ marginBottom:"20px"
 </p>
 
 <p>
-<b>Experience Required:</b> {requirement.experience_required} yrs
-</p>
-
-<p>
 <b>Salary:</b> ₹{requirement.salary_min} - ₹{requirement.salary_max}
 </p>
 
 </div>
+
 
 
 <h3>
@@ -191,6 +184,7 @@ overflow:"hidden"
 </tr>
 
 </thead>
+
 
 <tbody>
 
