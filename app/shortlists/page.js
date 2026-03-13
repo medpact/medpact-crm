@@ -22,6 +22,7 @@ id,
 doctor_id,
 requirement_id,
 status,
+remarks,
 created_at,
 doctors(
 id,
@@ -53,7 +54,6 @@ setShortlists(data || [])
 async function changeStatus(row,newStatus,message){
 
 const confirmAction = confirm(message)
-
 if(!confirmAction) return
 
 const {error} = await supabase
@@ -67,7 +67,7 @@ return
 }
 
 
-/* create placement record when placement done */
+/* Placement logic */
 
 if(newStatus === "placement_done"){
 
@@ -78,8 +78,6 @@ doctor_id:row.doctor_id,
 hospital_id:row.requirements.hospital_id,
 joining_date:new Date().toISOString().split("T")[0]
 })
-
-/* mark doctor not available */
 
 await supabase
 .from("doctors")
@@ -93,6 +91,34 @@ fetchShortlists()
 }
 
 
+
+/* REJECT FLOW */
+
+async function rejectCandidate(row){
+
+const reason = prompt("Enter rejection reason (Doctor / Hospital):")
+
+if(!reason) return
+
+const {error} = await supabase
+.from("shortlists")
+.update({
+status:"rejected",
+remarks:reason
+})
+.eq("id",row.id)
+
+if(error){
+alert("Error rejecting candidate")
+return
+}
+
+fetchShortlists()
+
+}
+
+
+
 function statusColor(status){
 
 if(status==="shortlisted") return "#f59e0b"
@@ -100,10 +126,12 @@ if(status==="interview_assigned") return "#3b82f6"
 if(status==="interview_completed") return "#fb923c"
 if(status==="offer_released") return "#8b5cf6"
 if(status==="placement_done") return "#16a34a"
+if(status==="rejected") return "#ef4444"
 
 return "#64748b"
 
 }
+
 
 
 function actionButton(row){
@@ -111,6 +139,7 @@ function actionButton(row){
 if(row.status === "shortlisted"){
 
 return(
+<>
 <button
 onClick={()=>changeStatus(
 row,
@@ -118,8 +147,16 @@ row,
 "Assign candidate for interview?"
 )}
 >
-Assign for Interview
+Assign Interview
 </button>
+
+<button
+style={{marginLeft:"6px"}}
+onClick={()=>rejectCandidate(row)}
+>
+Reject
+</button>
+</>
 )
 
 }
@@ -128,15 +165,24 @@ Assign for Interview
 if(row.status === "interview_assigned"){
 
 return(
+<>
 <button
 onClick={()=>changeStatus(
 row,
 "interview_completed",
-"Mark interview as completed?"
+"Mark interview completed?"
 )}
 >
-Interview Completed
+Interview Done
 </button>
+
+<button
+style={{marginLeft:"6px"}}
+onClick={()=>rejectCandidate(row)}
+>
+Reject
+</button>
+</>
 )
 
 }
@@ -145,15 +191,24 @@ Interview Completed
 if(row.status === "interview_completed"){
 
 return(
+<>
 <button
 onClick={()=>changeStatus(
 row,
 "offer_released",
-"Release offer to candidate?"
+"Release offer?"
 )}
 >
 Release Offer
 </button>
+
+<button
+style={{marginLeft:"6px"}}
+onClick={()=>rejectCandidate(row)}
+>
+Reject
+</button>
+</>
 )
 
 }
@@ -162,6 +217,7 @@ Release Offer
 if(row.status === "offer_released"){
 
 return(
+<>
 <button
 onClick={()=>changeStatus(
 row,
@@ -171,13 +227,23 @@ row,
 >
 Placement Done
 </button>
+
+<button
+style={{marginLeft:"6px"}}
+onClick={()=>rejectCandidate(row)}
+>
+Reject
+</button>
+</>
 )
 
 }
 
+
 return "-"
 
 }
+
 
 
 return(
@@ -202,13 +268,14 @@ overflow:"hidden"
 
 <tr>
 
-<th align="left">Doctor</th>
-<th align="left">Specialty</th>
-<th align="left">Hospital</th>
-<th align="left">Requirement</th>
-<th align="left">City</th>
-<th align="left">Status</th>
-<th align="left">Actions</th>
+<th>Doctor</th>
+<th>Specialty</th>
+<th>Hospital</th>
+<th>Requirement</th>
+<th>City</th>
+<th>Status</th>
+<th>Remarks</th>
+<th>Actions</th>
 
 </tr>
 
@@ -248,6 +315,10 @@ background:statusColor(s.status)
 {s.status}
 </span>
 
+</td>
+
+<td style={{fontSize:"12px"}}>
+{s.remarks || "-"}
 </td>
 
 <td>
