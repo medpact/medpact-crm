@@ -29,6 +29,7 @@ city,
 experience_required,
 salary_min,
 salary_max,
+entry_date,
 positions,
 priority,
 status,
@@ -196,7 +197,7 @@ overflow:"hidden"
 <thead style={{background:"#f8fafc"}}>
 
 <tr>
-
+<th align="left">Entry date</th>
 <th align="left">Hospital</th>
 <th align="left">Specialty</th>
 <th align="left">City</th>
@@ -215,7 +216,7 @@ overflow:"hidden"
 {paginated.map(r=>(
 
 <tr key={r.id} style={{borderTop:"1px solid #eee"}}>
-
+<td>{r.entry_date}</td>
 <td>{r.hospitals?.hospital_name}</td>
 
 <td>{r.specialties?.name}</td>
