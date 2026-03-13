@@ -179,6 +179,7 @@ overflow:"hidden"
 <th align="left">Experience</th>
 <th align="left">City</th>
 <th align="left">Phone</th>
+<th align="left">Availability</th>  
 <th align="left">Actions</th>
 
 </tr>
@@ -201,7 +202,7 @@ overflow:"hidden"
 <td>{d.city}</td>
 
 <td>{d.phone}</td>
-
+<td>{d.availability_status}</td>
 <td>
 
 <a
