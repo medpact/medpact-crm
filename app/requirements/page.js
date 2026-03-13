@@ -9,8 +9,8 @@ export default function RequirementsPage(){
 const [requirements,setRequirements] = useState([])
 const [search,setSearch] = useState("")
 const [page,setPage] = useState(1)
-
 const [sortMatches,setSortMatches] = useState("desc")
+const [dateFilter,setDateFilter] = useState("all")
 
 const pageSize = 20
 
@@ -98,17 +98,58 @@ const hospital = r.hospitals?.hospital_name?.toLowerCase() || ""
 const specialty = r.specialties?.name?.toLowerCase() || ""
 const city = r.city?.toLowerCase() || ""
 
-return(
+const matchesSearch =
 hospital.includes(search.toLowerCase()) ||
 specialty.includes(search.toLowerCase()) ||
 city.includes(search.toLowerCase())
-)
+
+if(!matchesSearch) return false
+
+
+/* DATE FILTER */
+
+if(dateFilter==="all") return true
+
+const today = new Date()
+const entry = new Date(r.entry_date)
+
+if(dateFilter==="today"){
+
+return entry.toDateString() === today.toDateString()
+
+}
+
+if(dateFilter==="7days"){
+
+const past = new Date()
+past.setDate(today.getDate()-7)
+
+return entry >= past
+
+}
+
+if(dateFilter==="30days"){
+
+const past = new Date()
+past.setDate(today.getDate()-30)
+
+return entry >= past
+
+}
+
+return true
 
 })
 
 
 
+/* SORT */
+
 const sorted = [...filtered].sort((a,b)=>{
+
+const dateDiff = new Date(b.entry_date) - new Date(a.entry_date)
+
+if(dateDiff !== 0) return dateDiff
 
 if(sortMatches==="desc"){
 return b.match_count - a.match_count
@@ -159,11 +200,11 @@ borderRadius:"6px"
 
 
 
-{/* SEARCH + SORT */}
+{/* FILTER BAR */}
 
 <div style={{
 display:"flex",
-gap:"20px",
+gap:"15px",
 marginBottom:"20px"
 }}>
 
@@ -175,7 +216,7 @@ setSearch(e.target.value)
 setPage(1)
 }}
 style={{
-width:"320px",
+width:"280px",
 padding:"8px",
 border:"1px solid #ddd",
 borderRadius:"6px"
@@ -184,20 +225,32 @@ borderRadius:"6px"
 
 
 <select
-value={sortMatches}
-onChange={(e)=>setSortMatches(e.target.value)}
-style={{
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px"
+value={dateFilter}
+onChange={(e)=>{
+setDateFilter(e.target.value)
+setPage(1)
 }}
+style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 >
 
-<option value="desc">Sort by Matches (High → Low)</option>
-<option value="asc">Sort by Matches (Low → High)</option>
+<option value="all">All Dates</option>
+<option value="today">Today</option>
+<option value="7days">Last 7 Days</option>
+<option value="30days">Last 30 Days</option>
 
 </select>
 
+
+<select
+value={sortMatches}
+onChange={(e)=>setSortMatches(e.target.value)}
+style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
+>
+
+<option value="desc">Sort Matches High → Low</option>
+<option value="asc">Sort Matches Low → High</option>
+
+</select>
 
 </div>
 
@@ -217,14 +270,14 @@ overflow:"hidden"
 
 <tr>
 
-<th align="left" width="110">Entry Date</th>
-<th align="left">Hospital</th>
-<th align="left">Specialty</th>
-<th align="left">City</th>
-<th align="left">Experience</th>
-<th align="left">Salary</th>
-<th align="left">Positions</th>
-<th align="left">Priority</th>
+<th width="110">Entry Date</th>
+<th>Hospital</th>
+<th>Specialty</th>
+<th>City</th>
+<th>Experience</th>
+<th>Salary</th>
+<th>Positions</th>
+<th>Priority</th>
 <th align="center">Matches</th>
 
 </tr>
@@ -247,11 +300,7 @@ overflow:"hidden"
 
 <td>{r.experience_required ? `${r.experience_required} yrs` : "-"}</td>
 
-<td>
-
-{r.salary_min ? `~₹${r.salary_min.toLocaleString()}` : "-"}
-
-</td>
+<td>{r.salary_min ? `~₹${r.salary_min.toLocaleString()}` : "-"}</td>
 
 <td>{r.positions}</td>
 
@@ -279,8 +328,7 @@ color:"#fff",
 padding:"6px 14px",
 borderRadius:"20px",
 fontSize:"12px",
-cursor:"pointer",
-display:"inline-block"
+cursor:"pointer"
 }}>
 
 {r.match_count}
@@ -313,7 +361,7 @@ marginTop:"20px"
 
 {Array.from({length: totalPages}).map((_,i)=>{
 
-const p = i+1
+const p=i+1
 
 return(
 
@@ -336,7 +384,6 @@ color: page===p ? "#fff" : "#000"
 })}
 
 </div>
-
 
 </div>
 
