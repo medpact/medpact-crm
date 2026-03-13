@@ -14,7 +14,6 @@ const [sortMatches,setSortMatches] = useState("desc")
 
 const pageSize = 20
 
-
 useEffect(()=>{
 loadRequirements()
 },[])
@@ -60,9 +59,6 @@ const {count} = await supabase
 .from("doctors")
 .select("*",{count:"exact",head:true})
 .eq("specialty_id",r.specialty_id)
-.ilike("city",`%${r.city}%`)
-.gte("experience_years",r.experience_required || 0)
-.eq("availability_status","available")
 
 result.push({
 ...r,
@@ -89,7 +85,6 @@ city.includes(search.toLowerCase())
 )
 
 })
-
 
 
 /* SORT BY MATCHES */
