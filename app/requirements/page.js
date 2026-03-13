@@ -270,7 +270,8 @@ overflow:"hidden"
 
 <tr>
 
-<th width="110">Entry Date</th>
+//<th width="110">
+<th align="left">Entry Date</th>
 <th align="left">Hospital</th>
 <th align="left">Specialty</th>
 <th align="left">City</th>
