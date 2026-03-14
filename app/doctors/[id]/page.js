@@ -10,15 +10,15 @@ export default function DoctorProfile(){
 const { id } = useParams()
 
 const [doctor,setDoctor] = useState(null)
-const [status,setStatus] = useState("")
-const [remarks,setRemarks] = useState("")
+const [specialties,setSpecialties] = useState([])
 const [saving,setSaving] = useState(false)
 
 useEffect(()=>{
-fetchDoctor()
+loadDoctor()
+loadSpecialties()
 },[])
 
-async function fetchDoctor(){
+async function loadDoctor(){
 
 const {data,error} = await supabase
 .from("doctors")
@@ -27,12 +27,9 @@ id,
 name,
 qualification,
 specialty_id,
-specialties(name),
 experience_years,
 phone,
 email,
-state_id,
-city_id,
 city,
 preferred_location,
 expected_ctc,
@@ -49,12 +46,30 @@ return
 }
 
 setDoctor(data)
-setStatus(data.availability_status)
-setRemarks(data.remarks || "")
 
 }
 
-async function updateDoctor(){
+async function loadSpecialties(){
+
+const {data} = await supabase
+.from("specialties")
+.select("id,name")
+.order("name")
+
+setSpecialties(data || [])
+
+}
+
+function updateField(field,value){
+
+setDoctor(prev=>({
+...prev,
+[field]:value
+}))
+
+}
+
+async function saveDoctor(){
 
 const confirmChange = confirm("Save changes to doctor profile?")
 if(!confirmChange) return
@@ -64,40 +79,41 @@ setSaving(true)
 const {error} = await supabase
 .from("doctors")
 .update({
-availability_status:status,
-remarks:remarks
+name:doctor.name,
+qualification:doctor.qualification,
+specialty_id:doctor.specialty_id,
+experience_years:doctor.experience_years,
+phone:doctor.phone,
+email:doctor.email,
+city:doctor.city,
+preferred_location:doctor.preferred_location,
+expected_ctc:doctor.expected_ctc,
+availability_status:doctor.availability_status,
+source:doctor.source,
+remarks:doctor.remarks
 })
 .eq("id",id)
 
 setSaving(false)
 
 if(error){
-alert("Error updating doctor")
 console.log(error)
+alert("Error updating doctor")
 return
 }
 
 alert("Doctor updated successfully")
-fetchDoctor()
-
-}
-
-function statusColor(status){
-
-if(status==="available") return "#16a34a"
-if(status==="not_available") return "#ef4444"
-if(status==="in_process") return "#f59e0b"
-
-return "#64748b"
 
 }
 
 if(!doctor){
+
 return(
 <div style={{padding:"30px"}}>
 Loading doctor...
 </div>
 )
+
 }
 
 return(
@@ -114,58 +130,132 @@ border:"1px solid #e5e7eb",
 borderRadius:"8px",
 padding:"25px",
 maxWidth:"700px"
-}}>
+}}
 
-<h2 style={{marginTop:0}}>
-{doctor.name}
-</h2>
+>
 
-<p><b>Qualification:</b> {doctor.qualification}</p>
-<p><b>Specialty:</b> {doctor.specialties?.name}</p>
-<p><b>Experience:</b> {doctor.experience_years} years</p>
+<h2>Edit Doctor</h2>
 
-<p><b>Phone:</b> {doctor.phone}</p>
-<p><b>Email:</b> {doctor.email}</p>
-
-<p><b>City:</b> {doctor.city}</p>
-<p><b>Preferred Relocation City:</b> {doctor.preferred_location}</p>
-
-<p><b>Expected CTC:</b> ₹{doctor.expected_ctc}</p>
-
-<p><b>Source:</b> {doctor.source}</p>
+{/* Name */}
 
 <p>
+<b>Name</b><br/>
+<input
+value={doctor.name || ""}
+onChange={(e)=>updateField("name",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
-<b>Availability:</b>
+{/* Qualification */}
 
-<span
-style={{
-marginLeft:"10px",
-padding:"4px 10px",
-borderRadius:"20px",
-color:"#fff",
-background:statusColor(doctor.availability_status),
-fontSize:"12px"
-}}
+<p>
+<b>Qualification</b><br/>
+<input
+value={doctor.qualification || ""}
+onChange={(e)=>updateField("qualification",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
+
+{/* Specialty */}
+
+<p>
+<b>Specialty</b><br/>
+<select
+value={doctor.specialty_id || ""}
+onChange={(e)=>updateField("specialty_id",Number(e.target.value))}
+style={{width:"100%",padding:"8px"}}
 >
-{doctor.availability_status}
-</span>
+
+<option value="">Select Specialty</option>
+
+{specialties.map(s=>(
+<option key={s.id} value={s.id}>
+{s.name}
+</option>
+))}
+
+</select>
 
 </p>
 
-<div style={{marginTop:"20px"}}>
+{/* Experience */}
 
-<label>Change Availability</label>
+<p>
+<b>Experience (Years)</b><br/>
+<input
+type="number"
+value={doctor.experience_years || ""}
+onChange={(e)=>updateField("experience_years",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
+{/* Phone */}
+
+<p>
+<b>Phone</b><br/>
+<input
+value={doctor.phone || ""}
+onChange={(e)=>updateField("phone",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
+
+{/* Email */}
+
+<p>
+<b>Email</b><br/>
+<input
+value={doctor.email || ""}
+onChange={(e)=>updateField("email",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
+
+{/* City */}
+
+<p>
+<b>City</b><br/>
+<input
+value={doctor.city || ""}
+onChange={(e)=>updateField("city",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
+
+{/* Preferred Location */}
+
+<p>
+<b>Preferred Relocation City</b><br/>
+<input
+value={doctor.preferred_location || ""}
+onChange={(e)=>updateField("preferred_location",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
+
+{/* Expected CTC */}
+
+<p>
+<b>Expected CTC</b><br/>
+<input
+type="number"
+value={doctor.expected_ctc || ""}
+onChange={(e)=>updateField("expected_ctc",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
+
+{/* Availability */}
+
+<p>
+<b>Availability</b><br/>
 <select
-value={status}
-onChange={(e)=>setStatus(e.target.value)}
-style={{
-padding:"8px",
-border:"1px solid #ddd",
-borderRadius:"6px",
-marginLeft:"10px"
-}}
+value={doctor.availability_status || ""}
+onChange={(e)=>updateField("availability_status",e.target.value)}
+style={{width:"100%",padding:"8px"}}
 >
 
 <option value="available">Available</option>
@@ -173,31 +263,35 @@ marginLeft:"10px"
 <option value="in_process">In Process</option>
 
 </select>
+</p>
 
-</div>
+{/* Source */}
 
-<div style={{marginTop:"20px"}}>
-
-<label>Remarks</label>
-
-<textarea
-value={remarks}
-onChange={(e)=>setRemarks(e.target.value)}
-rows="4"
-style={{
-width:"100%",
-padding:"10px",
-border:"1px solid #ddd",
-borderRadius:"6px"
-}}
+<p>
+<b>Source</b><br/>
+<input
+value={doctor.source || ""}
+onChange={(e)=>updateField("source",e.target.value)}
+style={{width:"100%",padding:"8px"}}
 />
+</p>
 
-</div>
+{/* Remarks */}
 
-<div style={{marginTop:"20px"}}>
+<p>
+<b>Remarks</b><br/>
+<textarea
+value={doctor.remarks || ""}
+onChange={(e)=>updateField("remarks",e.target.value)}
+rows="4"
+style={{width:"100%",padding:"10px"}}
+/>
+</p>
+
+{/* Save */}
 
 <button
-onClick={updateDoctor}
+onClick={saveDoctor}
 disabled={saving}
 style={{
 padding:"10px 18px",
@@ -210,23 +304,6 @@ cursor:"pointer"
 >
 Save Changes
 </button>
-
-</div>
-
-<div style={{marginTop:"25px"}}>
-
-<a
-href={`https://wa.me/91${doctor.phone}`}
-target="_blank"
-style={{
-textDecoration:"none",
-fontSize:"16px"
-}}
->
-💬 WhatsApp
-</a>
-
-</div>
 
 </div>
 
