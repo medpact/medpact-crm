@@ -30,10 +30,15 @@ loadSpecialties()
 
 async function loadHospitals(){
 
-const {data} = await supabase
+const {data,error} = await supabase
 .from("hospitals")
-.select(`id,hospital_name,city_id,cities(name)`)
+.select("id,hospital_name,city")
 .order("hospital_name")
+
+if(error){
+console.log("Hospital load error:",error)
+return
+}
 
 setHospitals(data || [])
 
@@ -147,7 +152,7 @@ setHospital(e.target.value)
 const selected = hospitals.find(h => h.id == e.target.value)
 
 if(selected){
-setCity(selected.cities?.name || "")
+setCity(selected.city || "")
 }
 
 }}
