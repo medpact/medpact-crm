@@ -18,7 +18,6 @@ useEffect(()=>{
 fetchDoctor()
 },[])
 
-
 async function fetchDoctor(){
 
 const {data,error} = await supabase
@@ -26,15 +25,20 @@ const {data,error} = await supabase
 .select(`
 id,
 name,
+qualification,
+specialty_id,
+specialties(name),
 experience_years,
-city,
 phone,
 email,
-availability_status,
+state_id,
+city_id,
+city,
+preferred_location,
 expected_ctc,
-qualification,
-remarks,
-specialties(name)
+availability_status,
+source,
+remarks
 `)
 .eq("id",id)
 .single()
@@ -50,11 +54,9 @@ setRemarks(data.remarks || "")
 
 }
 
-
 async function updateDoctor(){
 
 const confirmChange = confirm("Save changes to doctor profile?")
-
 if(!confirmChange) return
 
 setSaving(true)
@@ -76,11 +78,9 @@ return
 }
 
 alert("Doctor updated successfully")
-
 fetchDoctor()
 
 }
-
 
 function statusColor(status){
 
@@ -92,43 +92,21 @@ return "#64748b"
 
 }
 
-
-function statusLabel(status){
-
-if(status==="available") return "Available"
-if(status==="not_available") return "Not Available"
-if(status==="in_process") return "In Process"
-
-return status
-
-}
-
-
 if(!doctor){
-
 return(
 <div style={{padding:"30px"}}>
 Loading doctor...
 </div>
 )
-
 }
-
 
 return(
 
 <div style={{color:"#0f172a"}}>
 
-{/* Back */}
-
 <div style={{marginBottom:"20px"}}>
-
-<Link href="/doctors" style={{textDecoration:"none"}}>
-← Back to Doctors
-</Link>
-
+<Link href="/doctors">← Back to Doctors</Link>
 </div>
-
 
 <div style={{
 background:"#fff",
@@ -142,33 +120,19 @@ maxWidth:"700px"
 {doctor.name}
 </h2>
 
+<p><b>Qualification:</b> {doctor.qualification}</p>
+<p><b>Specialty:</b> {doctor.specialties?.name}</p>
+<p><b>Experience:</b> {doctor.experience_years} years</p>
 
-<p>
-<b>Specialty:</b> {doctor.specialties?.name}
-</p>
+<p><b>Phone:</b> {doctor.phone}</p>
+<p><b>Email:</b> {doctor.email}</p>
 
-<p>
-<b>Experience:</b> {doctor.experience_years} years
-</p>
+<p><b>City:</b> {doctor.city}</p>
+<p><b>Preferred Relocation City:</b> {doctor.preferred_location}</p>
 
-<p>
-<b>City:</b> {doctor.city}
-</p>
+<p><b>Expected CTC:</b> ₹{doctor.expected_ctc}</p>
 
-<p>
-<b>Phone:</b> {doctor.phone}
-</p>
-
-<p>
-<b>Email:</b> {doctor.email}
-</p>
-
-<p>
-<b>Expected CTC:</b> ₹{doctor.expected_ctc}
-</p>
-
-
-{/* Availability */}
+<p><b>Source:</b> {doctor.source}</p>
 
 <p>
 
@@ -184,19 +148,14 @@ background:statusColor(doctor.availability_status),
 fontSize:"12px"
 }}
 >
-{statusLabel(doctor.availability_status)}
+{doctor.availability_status}
 </span>
 
 </p>
 
-
-{/* Edit Status */}
-
 <div style={{marginTop:"20px"}}>
 
-<label style={{display:"block",marginBottom:"5px"}}>
-Change Availability
-</label>
+<label>Change Availability</label>
 
 <select
 value={status}
@@ -205,7 +164,7 @@ style={{
 padding:"8px",
 border:"1px solid #ddd",
 borderRadius:"6px",
-marginRight:"10px"
+marginLeft:"10px"
 }}
 >
 
@@ -217,14 +176,9 @@ marginRight:"10px"
 
 </div>
 
-
-{/* Remarks */}
-
 <div style={{marginTop:"20px"}}>
 
-<label style={{display:"block",marginBottom:"5px"}}>
-Remarks
-</label>
+<label>Remarks</label>
 
 <textarea
 value={remarks}
@@ -239,9 +193,6 @@ borderRadius:"6px"
 />
 
 </div>
-
-
-{/* Save Button */}
 
 <div style={{marginTop:"20px"}}>
 
@@ -262,21 +213,12 @@ Save Changes
 
 </div>
 
-
-<p style={{marginTop:"25px"}}>
-<b>Qualification:</b> {doctor.qualification}
-</p>
-
-
-{/* Actions */}
-
 <div style={{marginTop:"25px"}}>
 
 <a
 href={`https://wa.me/91${doctor.phone}`}
 target="_blank"
 style={{
-marginRight:"20px",
 textDecoration:"none",
 fontSize:"16px"
 }}
