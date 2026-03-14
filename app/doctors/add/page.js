@@ -16,6 +16,7 @@ const [phone,setPhone] = useState("")
 const [email,setEmail] = useState("")
 const [state,setState] = useState("")
 const [city,setCity] = useState("")
+const [preferredLocation,setPreferredLocation] = useState("")
 const [expectedCTC,setExpectedCTC] = useState("")
 const [availability,setAvailability] = useState("available")
 const [remarks,setRemarks] = useState("")
@@ -113,6 +114,8 @@ state_id: state ? Number(state) : null,
 
 city_id: city ? Number(city) : null,
 
+preferred_location: preferredLocation || null,
+
 expected_ctc: expectedCTC ? Number(expectedCTC) : null,
 
 availability_status: availability || "available",
@@ -141,7 +144,6 @@ return(
 
 <h2 style={{marginBottom:"20px"}}>Add Doctor</h2>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>Name</label>
 <input
@@ -151,7 +153,6 @@ style={{width:"100%",padding:"8px"}}
 />
 </div>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>Qualification</label>
 <input
@@ -160,7 +161,6 @@ onChange={(e)=>setQualification(e.target.value)}
 style={{width:"100%",padding:"8px"}}
 />
 </div>
-
 
 <div style={{marginBottom:"15px"}}>
 <label>Specialty</label>
@@ -180,7 +180,6 @@ style={{width:"100%",padding:"8px"}}
 </select>
 </div>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>Experience (Years)</label>
 <input
@@ -191,7 +190,6 @@ style={{width:"100%",padding:"8px"}}
 />
 </div>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>Phone</label>
 <input
@@ -201,7 +199,6 @@ style={{width:"100%",padding:"8px"}}
 />
 </div>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>Email</label>
 <input
@@ -210,7 +207,6 @@ onChange={(e)=>setEmail(e.target.value)}
 style={{width:"100%",padding:"8px"}}
 />
 </div>
-
 
 <div style={{marginBottom:"15px"}}>
 <label>State</label>
@@ -230,7 +226,6 @@ style={{width:"100%",padding:"8px"}}
 </select>
 </div>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>City</label>
 <select
@@ -249,6 +244,14 @@ style={{width:"100%",padding:"8px"}}
 </select>
 </div>
 
+<div style={{marginBottom:"15px"}}>
+<label>Relocation City (Preferred Location)</label>
+<input
+value={preferredLocation}
+onChange={(e)=>setPreferredLocation(e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</div>
 
 <div style={{marginBottom:"15px"}}>
 <label>Expected CTC</label>
@@ -259,7 +262,6 @@ onChange={(e)=>setExpectedCTC(e.target.value)}
 style={{width:"100%",padding:"8px"}}
 />
 </div>
-
 
 <div style={{marginBottom:"15px"}}>
 <label>Availability</label>
@@ -274,7 +276,6 @@ style={{width:"100%",padding:"8px"}}
 </select>
 </div>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>Source</label>
 <input
@@ -284,7 +285,6 @@ style={{width:"100%",padding:"8px"}}
 />
 </div>
 
-
 <div style={{marginBottom:"15px"}}>
 <label>Remarks</label>
 <textarea
@@ -293,7 +293,6 @@ onChange={(e)=>setRemarks(e.target.value)}
 style={{width:"100%",padding:"8px"}}
 />
 </div>
-
 
 <button
 onClick={saveDoctor}
@@ -308,7 +307,6 @@ cursor:"pointer"
 >
 Save Doctor
 </button>
-
 
 </div>
 
