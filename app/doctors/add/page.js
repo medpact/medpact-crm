@@ -9,20 +9,25 @@ export default function AddDoctor(){
 const router = useRouter()
 
 const [name,setName] = useState("")
+const [qualification,setQualification] = useState("")
 const [specialty,setSpecialty] = useState("")
 const [experience,setExperience] = useState("")
 const [phone,setPhone] = useState("")
 const [email,setEmail] = useState("")
+const [state,setState] = useState("")
 const [city,setCity] = useState("")
 const [expectedCTC,setExpectedCTC] = useState("")
 const [availability,setAvailability] = useState("available")
-const [qualification,setQualification] = useState("")
 const [remarks,setRemarks] = useState("")
+const [source,setSource] = useState("")
 
 const [specialties,setSpecialties] = useState([])
+const [states,setStates] = useState([])
+const [cities,setCities] = useState([])
 
 useEffect(()=>{
 loadSpecialties()
+loadStates()
 },[])
 
 async function loadSpecialties(){
@@ -38,6 +43,43 @@ setSpecialties(data || [])
 
 }
 
+async function loadStates(){
+
+const {data,error} = await supabase
+.from("states")
+.select("id,name")
+.order("name")
+
+if(!error){
+setStates(data || [])
+}
+
+}
+
+async function loadCities(stateId){
+
+const {data,error} = await supabase
+.from("cities")
+.select("id,name")
+.eq("state_id",stateId)
+.order("name")
+
+if(!error){
+setCities(data || [])
+}
+
+}
+
+async function handleStateChange(val){
+
+setState(val)
+setCity("")
+
+if(val){
+loadCities(val)
+}
+
+}
 
 async function saveDoctor(){
 
@@ -57,6 +99,8 @@ const {error} = await supabase
 
 name:name,
 
+qualification: qualification || null,
+
 specialty_id: specialty ? Number(specialty) : null,
 
 experience_years: experience ? Number(experience) : null,
@@ -65,15 +109,17 @@ phone: phone || null,
 
 email: email || null,
 
-city: city || null,
+state_id: state ? Number(state) : null,
+
+city_id: city ? Number(city) : null,
 
 expected_ctc: expectedCTC ? Number(expectedCTC) : null,
 
 availability_status: availability || "available",
 
-qualification: qualification || null,
+remarks: remarks || null,
 
-remarks: remarks || null
+source: source || null
 
 })
 
@@ -89,7 +135,6 @@ router.push("/doctors")
 
 }
 
-
 return(
 
 <div style={{maxWidth:"600px"}}>
@@ -102,6 +147,16 @@ return(
 <input
 value={name}
 onChange={(e)=>setName(e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</div>
+
+
+<div style={{marginBottom:"15px"}}>
+<label>Qualification</label>
+<input
+value={qualification}
+onChange={(e)=>setQualification(e.target.value)}
 style={{width:"100%",padding:"8px"}}
 />
 </div>
@@ -158,12 +213,40 @@ style={{width:"100%",padding:"8px"}}
 
 
 <div style={{marginBottom:"15px"}}>
+<label>State</label>
+<select
+value={state}
+onChange={(e)=>handleStateChange(e.target.value)}
+style={{width:"100%",padding:"8px"}}
+>
+<option value="">Select State</option>
+
+{states.map(s=>(
+<option key={s.id} value={s.id}>
+{s.name}
+</option>
+))}
+
+</select>
+</div>
+
+
+<div style={{marginBottom:"15px"}}>
 <label>City</label>
-<input
+<select
 value={city}
 onChange={(e)=>setCity(e.target.value)}
 style={{width:"100%",padding:"8px"}}
-/>
+>
+<option value="">Select City</option>
+
+{cities.map(c=>(
+<option key={c.id} value={c.id}>
+{c.name}
+</option>
+))}
+
+</select>
 </div>
 
 
@@ -193,10 +276,10 @@ style={{width:"100%",padding:"8px"}}
 
 
 <div style={{marginBottom:"15px"}}>
-<label>Qualification</label>
+<label>Source</label>
 <input
-value={qualification}
-onChange={(e)=>setQualification(e.target.value)}
+value={source}
+onChange={(e)=>setSource(e.target.value)}
 style={{width:"100%",padding:"8px"}}
 />
 </div>
