@@ -349,19 +349,6 @@ borderRadius:"4px"
 <div style={{display:"flex",gap:"10px"}}>
 
 <button
-onClick={()=>saveRequirements(false)}
-style={{
-padding:"10px 18px",
-background:"#16a34a",
-color:"#fff",
-border:"none",
-borderRadius:"6px"
-}}
->
-Save & Add More
-</button>
-
-<button
 onClick={()=>saveRequirements(true)}
 style={{
 padding:"10px 18px",
@@ -371,7 +358,7 @@ border:"none",
 borderRadius:"6px"
 }}
 >
-Save & Go to Requirements
+Save Requirements
 </button>
 
 </div>
