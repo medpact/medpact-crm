@@ -13,7 +13,6 @@ useEffect(()=>{
 loadRequirements()
 },[])
 
-
 async function loadRequirements(){
 
 const {data,error} = await supabase
@@ -43,7 +42,6 @@ setRequirements(withMatches)
 
 }
 
-
 async function addMatchCounts(reqs){
 
 let result=[]
@@ -66,22 +64,6 @@ return result
 
 }
 
-
-function formatDate(date){
-
-if(!date) return ""
-
-const d = new Date(date)
-
-const day = String(d.getDate()).padStart(2,'0')
-const month = String(d.getMonth()+1).padStart(2,'0')
-const year = String(d.getFullYear()).slice(-2)
-
-return `${day}-${month}-${year}`
-
-}
-
-
 /* GROUP REQUIREMENTS BY HOSPITAL */
 
 const grouped = {}
@@ -95,8 +77,6 @@ if(!grouped[hospital]) grouped[hospital]=[]
 grouped[hospital].push(r)
 
 })
-
-
 
 return(
 
@@ -116,7 +96,8 @@ padding:"8px 16px",
 background:"#2563eb",
 color:"#fff",
 border:"none",
-borderRadius:"6px"
+borderRadius:"6px",
+fontWeight:"600"
 }}>
 + Add Requirement
 </button>
@@ -124,24 +105,22 @@ borderRadius:"6px"
 
 </div>
 
-
 <div style={{
 border:"1px solid #e5e7eb",
-borderRadius:"8px",
-overflow:"hidden"
+borderRadius:"10px",
+overflow:"hidden",
+boxShadow:"0 2px 6px rgba(0,0,0,0.05)"
 }}>
 
 <table width="100%" cellPadding="12">
 
-<thead style={{background:"#f8fafc"}}>
+<thead style={{background:"#f1f5f9"}}>
 
 <tr>
-
 <th align="left">Hospital</th>
 <th align="left">City</th>
 <th align="center">Requirements</th>
 <th align="center">Expand</th>
-
 </tr>
 
 </thead>
@@ -158,38 +137,82 @@ return(
 
 <tr
 key={hospital}
-style={{borderTop:"1px solid #eee",cursor:"pointer"}}
+style={{
+borderTop:"1px solid #eee",
+cursor:"pointer",
+background: expanded===hospital ? "#f8fafc" : "#fff",
+fontWeight:"500"
+}}
 onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 >
 
 <td>{hospital}</td>
 <td>{reqs[0].city}</td>
-<td align="center">{reqs.length}</td>
-<td align="center">{expanded===hospital ? "▲" : "▼"}</td>
+<td align="center">
+
+<span style={{
+background:"#e2e8f0",
+padding:"4px 10px",
+borderRadius:"20px",
+fontSize:"12px"
+}}>
+{reqs.length}
+</span>
+
+</td>
+
+<td align="center" style={{fontSize:"18px",color:"#2563eb"}}>
+{expanded===hospital ? "▲" : "▼"}
+</td>
 
 </tr>
 
+{expanded===hospital && (
 
-{expanded===hospital && reqs.map(r=>(
+<tr>
 
-<tr key={r.id} style={{background:"#fafafa"}}>
+<td colSpan="4" style={{padding:"0",background:"#f8fafc"}}>
 
-<td style={{paddingLeft:"40px"}}>{r.specialties?.name}</td>
+<table width="100%" cellPadding="10">
+
+<tbody>
+
+{reqs.map((r,i)=>{
+
+let matchColor="#ef4444"
+
+if(r.match_count>=5) matchColor="#16a34a"
+else if(r.match_count>=2) matchColor="#f59e0b"
+
+return(
+
+<tr
+key={r.id}
+style={{
+borderTop:"1px solid #e5e7eb",
+background: i%2===0 ? "#ffffff" : "#f9fafb"
+}}
+>
+
+<td style={{paddingLeft:"40px",fontWeight:"500"}}>
+{r.specialties?.name}
+</td>
 
 <td>{r.city}</td>
 
-<td>{r.positions}</td>
+<td align="center">{r.positions}</td>
 
 <td align="center">
 
 <Link href={`/requirements/${r.id}/matches`}>
 
 <span style={{
-background:"#ef4444",
+background:matchColor,
 color:"#fff",
 padding:"6px 12px",
 borderRadius:"20px",
-fontSize:"12px"
+fontSize:"12px",
+fontWeight:"600"
 }}>
 {r.match_count}
 </span>
@@ -200,7 +223,19 @@ fontSize:"12px"
 
 </tr>
 
-))}
+)
+
+})}
+
+</tbody>
+
+</table>
+
+</td>
+
+</tr>
+
+)}
 
 </>
 
