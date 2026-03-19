@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../../lib/supabase"
 import { useParams } from "next/navigation"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export default function DoctorProfile(){
 
@@ -306,7 +307,42 @@ Save Changes
 </button>
 
 </div>
+<div style={{marginTop:"20px"}}>
 
+<button
+onClick={async ()=>{
+
+const confirmDelete = confirm("Are you sure you want to delete this doctor?")
+if(!confirmDelete) return
+
+const {error} = await supabase
+.from("doctors")
+.delete()
+.eq("id",id)
+
+if(error){
+alert("Error deleting doctor")
+return
+}
+
+alert("Doctor deleted")
+
+router.push("/doctors")
+
+}}
+style={{
+padding:"10px 18px",
+background:"#ef4444",
+color:"#fff",
+border:"none",
+borderRadius:"6px",
+cursor:"pointer"
+}}
+>
+Delete Doctor
+</button>
+
+</div>
 </div>
 
 )
