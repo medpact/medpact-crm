@@ -12,7 +12,7 @@ const [expanded,setExpanded] = useState(null)
 const [search,setSearch] = useState("")
 
 const [page,setPage] = useState(1)
-const pageSize = 5
+const pageSize = 20
 
 useEffect(()=>{
 loadRequirements()
