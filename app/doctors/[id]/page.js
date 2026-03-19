@@ -7,6 +7,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 export default function DoctorProfile(){
+const user = typeof window !== "undefined" ? localStorage.getItem("medpact_user") : null
+const isAdmin = user === "admin"
 
 const { id } = useParams()
 
@@ -308,7 +310,7 @@ Save Changes
 
 </div>
 <div style={{marginTop:"20px"}}>
-
+{isAdmin && (
 <button
 onClick={async ()=>{
 
@@ -341,7 +343,7 @@ cursor:"pointer"
 >
 Delete Doctor
 </button>
-
+)}
 </div>
 </div>
 
