@@ -6,8 +6,15 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function HospitalProfile(){
-const user = typeof window !== "undefined" ? localStorage.getItem("medpact_user") : null
-const isAdmin = user === "admin"
+const [isAdmin,setIsAdmin] = useState(false)
+
+useEffect(()=>{
+const user = localStorage.getItem("medpact_user")
+
+if(user && user.trim().toLowerCase() === "admin"){
+setIsAdmin(true)
+}
+},[])
 const { id } = useParams()
 const router = useRouter()
 
