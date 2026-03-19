@@ -2,27 +2,37 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "../../../lib/supabase"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function HospitalProfile(){
 
 const { id } = useParams()
+const router = useRouter()
 
 const [hospital,setHospital] = useState(null)
-const [requirements,setRequirements] = useState([])
+const [saving,setSaving] = useState(false)
 
 useEffect(()=>{
 loadHospital()
-loadRequirements()
 },[])
-
 
 async function loadHospital(){
 
 const {data,error} = await supabase
 .from("hospitals")
-.select("*")
+.select(`
+id,
+hospital_name,
+hospital_type,
+city,
+state,
+contact_person,
+contact_designation,
+phone,
+email,
+status
+`)
 .eq("id",id)
 .single()
 
@@ -35,43 +45,69 @@ setHospital(data)
 
 }
 
+function updateField(field,value){
 
-async function loadRequirements(){
+setHospital(prev=>({
+...prev,
+[field]:value
+}))
 
-const {data,error} = await supabase
-.from("requirements")
-.select(`
-id,
-experience_required,
-salary_min,
-salary_max,
-city,
-positions,
-status,
-specialties(name)
-`)
-.eq("hospital_id",id)
-.order("created_at",{ascending:false})
+}
+
+async function saveHospital(){
+
+const confirmSave = confirm("Save changes?")
+if(!confirmSave) return
+
+setSaving(true)
+
+const {error} = await supabase
+.from("hospitals")
+.update({
+hospital_name:hospital.hospital_name,
+hospital_type:hospital.hospital_type,
+city:hospital.city,
+state:hospital.state,
+contact_person:hospital.contact_person,
+contact_designation:hospital.contact_designation,
+phone:hospital.phone,
+email:hospital.email,
+status:hospital.status
+})
+.eq("id",id)
+
+setSaving(false)
 
 if(error){
 console.log(error)
+alert("Error updating hospital")
 return
 }
 
-setRequirements(data || [])
+alert("Hospital updated successfully")
 
 }
 
+async function deleteHospital(){
 
-function statusColor(status){
+const confirmDelete = confirm("Are you sure you want to delete this hospital?")
+if(!confirmDelete) return
 
-if(status==="active") return "#16a34a"
-if(status==="inactive") return "#ef4444"
+const {error} = await supabase
+.from("hospitals")
+.delete()
+.eq("id",id)
 
-return "#64748b"
-
+if(error){
+alert("Error deleting hospital")
+return
 }
 
+alert("Hospital deleted")
+
+router.push("/hospitals")
+
+}
 
 if(!hospital){
 
@@ -83,143 +119,161 @@ Loading hospital...
 
 }
 
-
 return(
 
 <div style={{color:"#0f172a"}}>
 
-{/* Back Button */}
+{/* Back */}
 
 <div style={{marginBottom:"20px"}}>
-
-<Link href="/hospitals">
-← Back to Hospitals
-</Link>
-
+<Link href="/hospitals">← Back to Hospitals</Link>
 </div>
-
-
-{/* Hospital Info */}
-
-<h2 style={{marginBottom:"20px"}}>
-{hospital.hospital_name}
-</h2>
-
 
 <div style={{
 background:"#fff",
 border:"1px solid #e5e7eb",
 borderRadius:"8px",
-padding:"20px",
-marginBottom:"30px",
+padding:"25px",
 maxWidth:"700px"
 }}>
 
-<p><b>Type:</b> {hospital.hospital_type}</p>
+<h2>Edit Hospital</h2>
 
-<p><b>City:</b> {hospital.city}</p>
-
-<p><b>State:</b> {hospital.state}</p>
-
-<p><b>Contact Person:</b> {hospital.contact_person}</p>
-
-<p><b>Phone:</b> {hospital.phone}</p>
-
-<p><b>Email:</b> {hospital.email}</p>
-
-<p><b>Website:</b> {hospital.website}</p>
+{/* Name */}
 
 <p>
-
-<b>Status:</b>
-
-<span style={{
-marginLeft:"10px",
-padding:"4px 10px",
-borderRadius:"20px",
-fontSize:"12px",
-color:"#fff",
-background:statusColor(hospital.status)
-}}>
-
-{hospital.status}
-
-</span>
-
+<b>Hospital Name</b><br/>
+<input
+value={hospital.hospital_name || ""}
+onChange={(e)=>updateField("hospital_name",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
 </p>
 
-<p><b>Notes:</b> {hospital.notes}</p>
+{/* Type */}
 
-</div>
+<p>
+<b>Hospital Type</b><br/>
+<input
+value={hospital.hospital_type || ""}
+onChange={(e)=>updateField("hospital_type",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
+{/* City */}
 
-{/* Requirements Section */}
+<p>
+<b>City</b><br/>
+<input
+value={hospital.city || ""}
+onChange={(e)=>updateField("city",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
-<h3 style={{marginBottom:"15px"}}>
-Hospital Requirements
-</h3>
+{/* State */}
 
+<p>
+<b>State</b><br/>
+<input
+value={hospital.state || ""}
+onChange={(e)=>updateField("state",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
-<div style={{
-background:"#fff",
-border:"1px solid #e5e7eb",
-borderRadius:"8px",
-overflow:"hidden"
-}}>
+{/* Contact Person */}
 
-<table width="100%" cellPadding="12">
+<p>
+<b>Contact Person</b><br/>
+<input
+value={hospital.contact_person || ""}
+onChange={(e)=>updateField("contact_person",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
-<thead style={{background:"#f8fafc"}}>
+{/* Designation */}
 
-<tr>
+<p>
+<b>Designation</b><br/>
+<input
+value={hospital.contact_designation || ""}
+onChange={(e)=>updateField("contact_designation",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
-<th align="left">Specialty</th>
-<th align="left">City</th>
-<th align="left">Experience</th>
-<th align="left">Salary</th>
-<th align="left">Positions</th>
-<th align="left">Status</th>
-<th align="left">Matches</th>
+{/* Phone */}
 
-</tr>
+<p>
+<b>Phone</b><br/>
+<input
+value={hospital.phone || ""}
+onChange={(e)=>updateField("phone",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
-</thead>
+{/* Email */}
 
-<tbody>
+<p>
+<b>Email</b><br/>
+<input
+value={hospital.email || ""}
+onChange={(e)=>updateField("email",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+/>
+</p>
 
-{requirements.map(r=>(
+{/* Status */}
 
-<tr key={r.id} style={{borderTop:"1px solid #e5e7eb"}}>
+<p>
+<b>Status</b><br/>
+<select
+value={hospital.status || ""}
+onChange={(e)=>updateField("status",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+>
+<option value="active">Active</option>
+<option value="inactive">Inactive</option>
+</select>
+</p>
 
-<td>{r.specialties?.name}</td>
+{/* Save Button */}
 
-<td>{r.city}</td>
+<button
+onClick={saveHospital}
+disabled={saving}
+style={{
+padding:"10px 18px",
+background:"#2563eb",
+color:"#fff",
+border:"none",
+borderRadius:"6px",
+cursor:"pointer",
+marginRight:"10px"
+}}
+>
+Save Changes
+</button>
 
-<td>{r.experience_required} yrs</td>
+{/* Delete Button */}
 
-<td>
-₹{r.salary_min} - ₹{r.salary_max}
-</td>
-
-<td>{r.positions}</td>
-
-<td>{r.status}</td>
-
-<td>
-
-<Link href={`/requirements/${r.id}/matches`}>
-View Matches
-</Link>
-
-</td>
-
-</tr>
-
-))}
-
-</tbody>
-
-</table>
+<button
+onClick={deleteHospital}
+style={{
+padding:"10px 18px",
+background:"#ef4444",
+color:"#fff",
+border:"none",
+borderRadius:"6px",
+cursor:"pointer"
+}}
+>
+Delete Hospital
+</button>
 
 </div>
 
