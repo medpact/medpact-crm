@@ -5,7 +5,8 @@ import { supabase } from "../../lib/supabase"
 import Link from "next/link"
 
 export default function RequirementsPage(){
-
+const user = typeof window !== "undefined" ? localStorage.getItem("medpact_user") : null
+const isAdmin = user === "admin"
 const [requirements,setRequirements] = useState([])
 const [expanded,setExpanded] = useState(null)
 
@@ -285,7 +286,7 @@ fontWeight:"600"
 </td>
 
 <td align="center">
-
+{isAdmin && (
 <button
 onClick={async (e)=>{
 e.stopPropagation()
@@ -317,7 +318,7 @@ fontSize:"16px"
 >
 🗑
 </button>
-
+)}
 </td>
 
 </tr>
