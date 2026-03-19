@@ -129,6 +129,7 @@ overflow:"hidden"
 <th>City</th>
 <th>Requirements</th>
 <th>Expand</th>
+ <th>Delete</th> 
 </tr>
 </thead>
 
@@ -172,6 +173,59 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 
 <tr key={r.id}>
 
+<td style={{paddingLeft:"40px"}}>
+{r.specialties?.name}
+</td>
+
+<td>{r.city}</td>
+
+<td>{r.positions}</td>
+
+<td>
+
+<Link href={`/requirements/${r.id}/matches`}>
+{r.match_count}
+</Link>
+
+</td>
+
+<td>
+
+<button
+onClick={async (e)=>{
+e.stopPropagation()
+
+const confirmDelete = confirm("Delete this requirement?")
+if(!confirmDelete) return
+
+const {error} = await supabase
+.from("requirements")
+.delete()
+.eq("id",r.id)
+
+if(error){
+alert("Error deleting")
+return
+}
+
+alert("Deleted successfully")
+
+loadRequirements()
+}}
+style={{
+background:"transparent",
+border:"none",
+cursor:"pointer",
+color:"#ef4444",
+fontSize:"16px"
+}}
+>
+🗑
+</button>
+
+</td>
+
+</tr>
 <td style={{paddingLeft:"40px"}}>
 {r.specialties?.name}
 </td>
