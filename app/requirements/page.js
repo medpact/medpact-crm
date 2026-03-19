@@ -9,6 +9,8 @@ export default function RequirementsPage(){
 const [requirements,setRequirements] = useState([])
 const [expanded,setExpanded] = useState(null)
 
+const [search,setSearch] = useState("")
+
 const [page,setPage] = useState(1)
 const pageSize = 5
 
@@ -67,7 +69,7 @@ return result
 
 }
 
-/* GROUP BY HOSPITAL */
+/* GROUP */
 
 const grouped = {}
 
@@ -77,13 +79,28 @@ if(!grouped[hospital]) grouped[hospital]=[]
 grouped[hospital].push(r)
 })
 
-const hospitalList = Object.keys(grouped)
+/* FILTER */
+
+const filteredHospitals = Object.keys(grouped).filter(hospital=>{
+
+const reqs = grouped[hospital]
+
+const hospitalMatch = hospital.toLowerCase().includes(search.toLowerCase())
+
+const anyReqMatch = reqs.some(r=>
+(r.specialties?.name || "").toLowerCase().includes(search.toLowerCase()) ||
+(r.city || "").toLowerCase().includes(search.toLowerCase())
+)
+
+return hospitalMatch || anyReqMatch
+
+})
 
 /* PAGINATION */
 
-const totalPages = Math.ceil(hospitalList.length / pageSize)
+const totalPages = Math.ceil(filteredHospitals.length / pageSize)
 
-const paginatedHospitals = hospitalList.slice(
+const paginatedHospitals = filteredHospitals.slice(
 (page-1)*pageSize,
 page*pageSize
 )
@@ -114,6 +131,27 @@ fontWeight:"600"
 + Add Requirement
 </button>
 </Link>
+
+</div>
+
+{/* SEARCH BAR */}
+
+<div style={{marginBottom:"20px"}}>
+
+<input
+placeholder="Search hospital, city or specialty..."
+value={search}
+onChange={(e)=>{
+setSearch(e.target.value)
+setPage(1)
+}}
+style={{
+width:"300px",
+padding:"8px",
+border:"1px solid #ddd",
+borderRadius:"6px"
+}}
+/>
 
 </div>
 
@@ -149,8 +187,6 @@ return(
 
 <>
 
-{/* HOSPITAL ROW */}
-
 <tr
 key={hospital}
 style={{
@@ -183,9 +219,6 @@ fontSize:"12px"
 </td>
 
 </tr>
-
-
-{/* EXPANDED REQUIREMENTS */}
 
 {expanded===hospital && (
 
