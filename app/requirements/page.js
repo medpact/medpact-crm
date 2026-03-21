@@ -5,26 +5,43 @@ import { supabase } from "../../lib/supabase"
 import Link from "next/link"
 
 export default function RequirementsPage(){
+
 const [isAdmin,setIsAdmin] = useState(false)
 
 useEffect(()=>{
 const user = localStorage.getItem("medpact_user")
-
-if(user && user.trim().toLowerCase() === "admin"){
+if(user?.trim().toLowerCase() === "admin"){
 setIsAdmin(true)
 }
 },[])
+
 const [requirements,setRequirements] = useState([])
 const [expanded,setExpanded] = useState(null)
 
 const [search,setSearch] = useState("")
-
 const [page,setPage] = useState(1)
 const pageSize = 20
 
 useEffect(()=>{
 loadRequirements()
 },[])
+
+
+/* FORMAT DATE */
+
+function formatDate(date){
+if(!date) return ""
+
+const d = new Date(date)
+const day = String(d.getDate()).padStart(2,"0")
+const month = String(d.getMonth()+1).padStart(2,"0")
+const year = d.getFullYear()
+
+return `${day}/${month}/${year}`
+}
+
+
+/* LOAD DATA (OPTIMIZED) */
 
 async function loadRequirements(){
 
@@ -33,11 +50,8 @@ const {data,error} = await supabase
 .select(`
 id,
 city,
-experience_required,
-salary_min,
 entry_date,
 positions,
-priority,
 specialty_id,
 hospitals(hospital_name),
 specialties(name)
@@ -49,33 +63,31 @@ console.log(error)
 return
 }
 
-const withMatches = await addMatchCounts(data || [])
+/* 🔥 GET ALL SPECIALTY IDS */
+const specialtyIds = [...new Set(data.map(d=>d.specialty_id))]
 
-setRequirements(withMatches)
-
-}
-
-async function addMatchCounts(reqs){
-
-let result=[]
-
-for(const r of reqs){
-
-const {count} = await supabase
+/* 🔥 GET MATCH COUNTS IN ONE QUERY */
+const {data:doctorCounts} = await supabase
 .from("doctors")
-.select("*",{count:"exact",head:true})
-.eq("specialty_id",r.specialty_id)
+.select("specialty_id", {count:"exact"})
 
-result.push({
-...r,
-match_count:count || 0
+/* CREATE MAP */
+const countMap = {}
+
+doctorCounts?.forEach(d=>{
+countMap[d.specialty_id] = (countMap[d.specialty_id] || 0) + 1
 })
 
+/* MERGE MATCH COUNT */
+const finalData = data.map(r=>({
+...r,
+match_count: countMap[r.specialty_id] || 0
+}))
+
+setRequirements(finalData)
+
 }
 
-return result
-
-}
 
 /* GROUP */
 
@@ -83,9 +95,12 @@ const grouped = {}
 
 requirements.forEach(r=>{
 const hospital = r.hospitals?.hospital_name || "Unknown"
+
 if(!grouped[hospital]) grouped[hospital]=[]
+
 grouped[hospital].push(r)
 })
+
 
 /* FILTER */
 
@@ -104,6 +119,7 @@ return hospitalMatch || anyReqMatch
 
 })
 
+
 /* PAGINATION */
 
 const totalPages = Math.ceil(filteredHospitals.length / pageSize)
@@ -112,6 +128,7 @@ const paginatedHospitals = filteredHospitals.slice(
 (page-1)*pageSize,
 page*pageSize
 )
+
 
 return(
 
@@ -133,8 +150,7 @@ padding:"8px 16px",
 background:"#2563eb",
 color:"#fff",
 border:"none",
-borderRadius:"6px",
-fontWeight:"600"
+borderRadius:"6px"
 }}>
 + Add Requirement
 </button>
@@ -142,9 +158,7 @@ fontWeight:"600"
 
 </div>
 
-{/* SEARCH BAR */}
-
-<div style={{marginBottom:"20px"}}>
+{/* SEARCH */}
 
 <input
 placeholder="Search hospital, city or specialty..."
@@ -154,33 +168,32 @@ setSearch(e.target.value)
 setPage(1)
 }}
 style={{
-width:"300px",
+marginBottom:"20px",
 padding:"8px",
+width:"300px",
 border:"1px solid #ddd",
 borderRadius:"6px"
 }}
 />
-
-</div>
 
 {/* TABLE */}
 
 <div style={{
 border:"1px solid #e5e7eb",
 borderRadius:"10px",
-overflow:"hidden",
-boxShadow:"0 2px 6px rgba(0,0,0,0.05)"
+overflow:"hidden"
 }}>
 
 <table width="100%" cellPadding="12">
 
-<thead style={{background:"#f1f5f9"}}>
+<thead style={{background:"#f1f5f9", textAlign:"left"}}>
 
 <tr>
-<th align="left">Hospital</th>
-<th align="left">City</th>
-<th align="center">Requirements</th>
-<th align="center">Expand</th>
+<th>Date</th>
+<th>Hospital</th>
+<th>City</th>
+<th>Requirements</th>
+<th>Expand</th>
 </tr>
 
 </thead>
@@ -191,6 +204,9 @@ boxShadow:"0 2px 6px rgba(0,0,0,0.05)"
 
 const reqs = grouped[hospital]
 
+/* 🔥 GET LATEST DATE */
+const latestDate = reqs[0]?.entry_date
+
 return(
 
 <>
@@ -199,46 +215,35 @@ return(
 key={hospital}
 style={{
 cursor:"pointer",
-background: expanded===hospital ? "#f8fafc" : "#fff",
-fontWeight:"500"
+background: expanded===hospital ? "#f8fafc" : "#fff"
 }}
 onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 >
+
+<td>{formatDate(latestDate)}</td>
 
 <td>{hospital}</td>
 
 <td>{reqs[0].city}</td>
 
-<td align="center">
+<td>{reqs.length}</td>
 
-<span style={{
-background:"#e2e8f0",
-padding:"4px 10px",
-borderRadius:"20px",
-fontSize:"12px"
-}}>
-{reqs.length}
-</span>
-
-</td>
-
-<td align="center" style={{color:"#2563eb",fontSize:"18px"}}>
-{expanded===hospital ? "▲" : "▼"}
-</td>
+<td>{expanded===hospital ? "▲" : "▼"}</td>
 
 </tr>
+
 
 {expanded===hospital && (
 
 <tr>
 
-<td colSpan="4" style={{padding:"0",background:"#f8fafc"}}>
+<td colSpan="5">
 
 <table width="100%" cellPadding="10">
 
-<thead>
+<thead style={{textAlign:"left"}}>
 <tr>
-<th align="left" style={{paddingLeft:"40px"}}>Specialty</th>
+<th style={{paddingLeft:"40px"}}>Specialty</th>
 <th>City</th>
 <th>Positions</th>
 <th>Matches</th>
@@ -248,80 +253,40 @@ fontSize:"12px"
 
 <tbody>
 
-{reqs.map((r,i)=>{
+{reqs.map((r)=>(
 
-let matchColor="#ef4444"
+<tr key={r.id}>
 
-if(r.match_count>=5) matchColor="#16a34a"
-else if(r.match_count>=2) matchColor="#f59e0b"
-
-return(
-
-<tr
-key={r.id}
-style={{
-borderTop:"1px solid #e5e7eb",
-background: i%2===0 ? "#ffffff" : "#f9fafb"
-}}
->
-
-<td style={{paddingLeft:"40px",fontWeight:"500"}}>
+<td style={{paddingLeft:"40px"}}>
 {r.specialties?.name}
 </td>
 
 <td>{r.city}</td>
 
-<td align="center">{r.positions}</td>
+<td>{r.positions}</td>
 
-<td align="center">
-
+<td>
 <Link href={`/requirements/${r.id}/matches`}>
-
-<span style={{
-background:matchColor,
-color:"#fff",
-padding:"6px 12px",
-borderRadius:"20px",
-fontSize:"12px",
-fontWeight:"600"
-}}>
 {r.match_count}
-</span>
-
 </Link>
-
 </td>
 
-<td align="center">
+<td>
 {isAdmin && (
 <button
 onClick={async (e)=>{
 e.stopPropagation()
 
-const confirmDelete = confirm("Delete this requirement?")
-if(!confirmDelete) return
+if(!confirm("Delete this requirement?")) return
 
-const {error} = await supabase
+await supabase
 .from("requirements")
 .delete()
 .eq("id",r.id)
 
-if(error){
-alert("Error deleting requirement")
-return
-}
-
-alert("Requirement deleted")
-
 loadRequirements()
 }}
-style={{
-background:"transparent",
-border:"none",
-cursor:"pointer",
-color:"#ef4444",
-fontSize:"16px"
-}}
+style={{color:"red",border:"none",background:"none"}}
 >
 🗑
 </button>
@@ -330,9 +295,7 @@ fontSize:"16px"
 
 </tr>
 
-)
-
-})}
+))}
 
 </tbody>
 
@@ -358,32 +321,25 @@ fontSize:"16px"
 
 {/* PAGINATION */}
 
-<div style={{
-marginTop:"20px",
-display:"flex",
-gap:"8px"
-}}>
+<div style={{marginTop:"20px",display:"flex",gap:"6px"}}>
 
 {Array.from({length:totalPages}).map((_,i)=>{
 
 const p=i+1
 
 return(
-
 <button
 key={p}
 onClick={()=>setPage(p)}
 style={{
 padding:"6px 10px",
 border:"1px solid #ddd",
-borderRadius:"6px",
 background:page===p?"#2563eb":"#fff",
 color:page===p?"#fff":"#000"
 }}
 >
 {p}
 </button>
-
 )
 
 })}
