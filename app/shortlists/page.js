@@ -13,7 +13,8 @@ fetchShortlists()
 },[])
 
 
-async function fetchShortlists(){
+/* DATE FORMAT */
+
 function formatDate(date){
 if(!date) return ""
 
@@ -24,6 +25,12 @@ const year = d.getFullYear()
 
 return `${day}/${month}/${year}`
 }
+
+
+/* FETCH */
+
+async function fetchShortlists(){
+
 const {data,error} = await supabase
 .from("shortlists")
 .select(`
@@ -60,6 +67,8 @@ setShortlists(data || [])
 }
 
 
+/* STATUS CHANGE */
+
 async function changeStatus(row,newStatus,message){
 
 const confirmAction = confirm(message)
@@ -76,7 +85,7 @@ return
 }
 
 
-/* Placement logic */
+/* Placement */
 
 if(newStatus === "placement_done"){
 
@@ -100,16 +109,12 @@ fetchShortlists()
 }
 
 
-
-/* REJECT FLOW */
+/* REJECT */
 
 async function rejectCandidate(row){
 
 const reason = prompt("Enter rejection reason (Doctor / Hospital):")
-
 if(!reason) return
-
-/* get existing doctor remarks */
 
 const {data:doctorData} = await supabase
 .from("doctors")
@@ -129,8 +134,6 @@ const updatedRemarks = doctorData?.remarks
 : newRemark
 
 
-/* update shortlist status */
-
 await supabase
 .from("shortlists")
 .update({
@@ -140,8 +143,6 @@ remarks:reason
 .eq("id",row.id)
 
 
-/* append remark in doctor profile */
-
 await supabase
 .from("doctors")
 .update({
@@ -149,12 +150,12 @@ remarks:updatedRemarks
 })
 .eq("id",row.doctor_id)
 
-
 fetchShortlists()
 
 }
 
 
+/* STATUS COLOR */
 
 function statusColor(status){
 
@@ -170,118 +171,71 @@ return "#64748b"
 }
 
 
+/* ACTION BUTTONS */
 
 function actionButton(row){
 
 if(row.status === "shortlisted"){
-
 return(
 <>
-<button
-onClick={()=>changeStatus(
-row,
-"interview_assigned",
-"Assign candidate for interview?"
-)}
->
+<button onClick={()=>changeStatus(row,"interview_assigned","Assign candidate for interview?")}>
 Assign Interview
 </button>
 
-<button
-style={{marginLeft:"6px"}}
-onClick={()=>rejectCandidate(row)}
->
+<button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
 </>
 )
-
 }
 
-
 if(row.status === "interview_assigned"){
-
 return(
 <>
-<button
-onClick={()=>changeStatus(
-row,
-"interview_completed",
-"Mark interview completed?"
-)}
->
+<button onClick={()=>changeStatus(row,"interview_completed","Mark interview completed?")}>
 Interview Done
 </button>
 
-<button
-style={{marginLeft:"6px"}}
-onClick={()=>rejectCandidate(row)}
->
+<button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
 </>
 )
-
 }
 
-
 if(row.status === "interview_completed"){
-
 return(
 <>
-<button
-onClick={()=>changeStatus(
-row,
-"offer_released",
-"Release offer?"
-)}
->
+<button onClick={()=>changeStatus(row,"offer_released","Release offer?")}>
 Release Offer
 </button>
 
-<button
-style={{marginLeft:"6px"}}
-onClick={()=>rejectCandidate(row)}
->
+<button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
 </>
 )
-
 }
 
-
 if(row.status === "offer_released"){
-
 return(
 <>
-<button
-onClick={()=>changeStatus(
-row,
-"placement_done",
-"Confirm placement?"
-)}
->
+<button onClick={()=>changeStatus(row,"placement_done","Confirm placement?")}>
 Placement Done
 </button>
 
-<button
-style={{marginLeft:"6px"}}
-onClick={()=>rejectCandidate(row)}
->
+<button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
 </>
 )
-
 }
-
 
 return "-"
-
 }
 
 
+/* UI */
 
 return(
 
@@ -290,7 +244,6 @@ return(
 <h2 style={{marginBottom:"20px"}}>
 Recruitment Pipeline
 </h2>
-
 
 <div style={{
 background:"#fff",
@@ -301,7 +254,7 @@ overflow:"hidden"
 
 <table width="100%" cellPadding="12">
 
-<thead style={{background:"#f8fafc"}}>
+<thead style={{background:"#f8fafc", textAlign:"left"}}>
 
 <tr>
 <th>Date</th>
@@ -313,7 +266,6 @@ overflow:"hidden"
 <th>Status</th>
 <th>Remarks</th>
 <th>Actions</th>
-
 </tr>
 
 </thead>
@@ -324,14 +276,14 @@ overflow:"hidden"
 
 <tr key={s.id} style={{borderTop:"1px solid #e5e7eb"}}>
 
-<td>
+<td>{formatDate(s.created_at)}</td>
 
+<td>
 <Link href={`/doctors/${s.doctors?.id}`}>
 {s.doctors?.name}
 </Link>
-
 </td>
-<td>{formatDate(p.shortlisted_at)}</td>
+
 <td>{s.doctors?.specialties?.name}</td>
 
 <td>{s.requirements?.hospitals?.hospital_name}</td>
@@ -341,7 +293,6 @@ overflow:"hidden"
 <td>{s.requirements?.city}</td>
 
 <td>
-
 <span style={{
 padding:"4px 10px",
 borderRadius:"20px",
@@ -351,7 +302,6 @@ background:statusColor(s.status)
 }}>
 {s.status}
 </span>
-
 </td>
 
 <td style={{fontSize:"12px"}}>
