@@ -48,10 +48,11 @@ let query = supabase
 id,
 name,
 experience_years,
-city,
+cities(name),
 phone,
 availability_status,
 specialty_id,
+preferred_location,
 specialties(name)
 `,{count:"exact"})
 .order("created_at",{ascending:false})
@@ -179,7 +180,7 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 <th>Name</th>
 <th>Specialty</th>
 <th>Experience</th>
-<th>City</th>
+<th>Req City</th>
 <th>Availability</th>
 <th>Phone</th>
 <th>Actions</th>
@@ -197,7 +198,7 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 <td>{d.name}</td>
 <td>{d.specialties?.name}</td>
 <td>{d.experience_years} yrs</td>
-<td>{d.city}</td>
+<td>{d.preferred_location}</td>
 
 <td>
 
