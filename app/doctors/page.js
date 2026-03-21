@@ -28,6 +28,22 @@ fetchDoctors()
 },[search,specialty,city,availability,page])
 
 
+/* FORMAT DATE */
+
+function formatDate(date){
+if(!date) return ""
+
+const d = new Date(date)
+const day = String(d.getDate()).padStart(2,"0")
+const month = String(d.getMonth()+1).padStart(2,"0")
+const year = d.getFullYear()
+
+return `${day}/${month}/${year}`
+}
+
+
+/* LOAD SPECIALTIES */
+
 async function fetchSpecialties(){
 
 const {data} = await supabase
@@ -39,6 +55,8 @@ setSpecialties(data || [])
 
 }
 
+
+/* LOAD DOCTORS */
 
 async function fetchDoctors(){
 
@@ -52,6 +70,7 @@ phone,
 availability_status,
 specialty_id,
 preferred_location,
+created_at,
 specialties(name)
 `,{count:"exact"})
 .order("created_at",{ascending:false})
@@ -66,7 +85,6 @@ if(specialty){
 query = query.eq("specialty_id",specialty)
 }
 
-/* 🔥 Now filtering relocation city instead of current city */
 if(city){
 query = query.ilike("preferred_location",`%${city}%`)
 }
@@ -89,7 +107,7 @@ return(
 
 <div style={{padding:"30px",color:"#0f172a"}}>
 
-{/* Header */}
+{/* HEADER */}
 
 <div style={{
 display:"flex",
@@ -115,7 +133,7 @@ borderRadius:"6px"
 </div>
 
 
-{/* Filters */}
+{/* FILTERS */}
 
 <div style={{
 display:"flex",
@@ -167,15 +185,17 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 </div>
 
 
-{/* Table */}
+{/* TABLE */}
 
 <div style={{border:"1px solid #eee",borderRadius:"8px"}}>
 
 <table width="100%" cellPadding="12">
-<thead style={{background:"#f8fafc", textAlign:"left"}}>  
+
+<thead style={{background:"#f8fafc", textAlign:"left"}}>
 
 <tr>
 
+<th>Date</th>
 <th>Name</th>
 <th>Specialty</th>
 <th>Experience</th>
@@ -194,14 +214,14 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 
 <tr key={d.id} style={{borderTop:"1px solid #eee"}}>
 
+<td>{formatDate(d.created_at)}</td>
+
 <td>{d.name}</td>
 <td>{d.specialties?.name}</td>
 <td>{d.experience_years} yrs</td>
-
 <td>{d.preferred_location}</td>
 
 <td>
-
 <span style={{
 padding:"4px 10px",
 borderRadius:"20px",
@@ -210,7 +230,6 @@ fontSize:"12px"
 }}>
 {d.availability_status}
 </span>
-
 </td>
 
 <td>{d.phone}</td>
@@ -240,7 +259,7 @@ style={{marginRight:"10px"}}
 </div>
 
 
-{/* Pagination */}
+{/* PAGINATION */}
 
 <div style={{
 marginTop:"20px",
@@ -277,5 +296,4 @@ color:page===p?"#fff":"#000"
 </div>
 
 )
-
 }
