@@ -48,7 +48,6 @@ let query = supabase
 id,
 name,
 experience_years,
-cities(name),
 phone,
 availability_status,
 specialty_id,
@@ -67,8 +66,9 @@ if(specialty){
 query = query.eq("specialty_id",specialty)
 }
 
+/* 🔥 Now filtering relocation city instead of current city */
 if(city){
-query = query.ilike("city",`%${city}%`)
+query = query.ilike("preferred_location",`%${city}%`)
 }
 
 if(availability){
@@ -145,7 +145,7 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 </select>
 
 <input
-placeholder="City"
+placeholder="Relocation City"
 value={city}
 onChange={(e)=>setCity(e.target.value)}
 style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
@@ -180,7 +180,7 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 <th>Name</th>
 <th>Specialty</th>
 <th>Experience</th>
-<th>Req City</th>
+<th>Relocation City</th>
 <th>Availability</th>
 <th>Phone</th>
 <th>Actions</th>
@@ -198,6 +198,7 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 <td>{d.name}</td>
 <td>{d.specialties?.name}</td>
 <td>{d.experience_years} yrs</td>
+
 <td>{d.preferred_location}</td>
 
 <td>
