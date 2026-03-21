@@ -23,13 +23,13 @@ const {data,error} = await supabase
 id,
 hospital_name,
 hospital_type,
-city,
-state,
 contact_person,
 contact_designation,
 phone,
 email,
-status
+status,
+cities(name),
+states(name)
 `)
 .order("hospital_name",{ascending:true})
 
@@ -119,8 +119,8 @@ overflow:"hidden"
 
 <td>{h.hospital_name}</td>
 <td>{h.hospital_type}</td>
-<td>{h.city}</td>
-<td>{h.state}</td>
+<td>{h.cities?.name}</td>
+<td>{h.states?.name}</td>
 <td>{h.contact_person}</td>
 <td>{h.contact_designation}</td>
 <td>{h.phone}</td>
