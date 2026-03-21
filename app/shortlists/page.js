@@ -14,7 +14,16 @@ fetchShortlists()
 
 
 async function fetchShortlists(){
+function formatDate(date){
+if(!date) return ""
 
+const d = new Date(date)
+const day = String(d.getDate()).padStart(2,"0")
+const month = String(d.getMonth()+1).padStart(2,"0")
+const year = d.getFullYear()
+
+return `${day}/${month}/${year}`
+}
 const {data,error} = await supabase
 .from("shortlists")
 .select(`
@@ -295,7 +304,7 @@ overflow:"hidden"
 <thead style={{background:"#f8fafc"}}>
 
 <tr>
-
+<th>Date</th>
 <th>Doctor</th>
 <th>Specialty</th>
 <th>Hospital</th>
@@ -322,7 +331,7 @@ overflow:"hidden"
 </Link>
 
 </td>
-
+<td>{formatDate(p.shortlisted_at)}</td>
 <td>{s.doctors?.specialties?.name}</td>
 
 <td>{s.requirements?.hospitals?.hospital_name}</td>
