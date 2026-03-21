@@ -6,24 +6,52 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function HospitalProfile(){
-const [isAdmin,setIsAdmin] = useState(false)
 
-useEffect(()=>{
-const user = localStorage.getItem("medpact_user")
-
-if(user && user.trim().toLowerCase() === "admin"){
-setIsAdmin(true)
-}
-},[])
 const { id } = useParams()
 const router = useRouter()
 
 const [hospital,setHospital] = useState(null)
+const [states,setStates] = useState([])
+const [cities,setCities] = useState([])
+
 const [saving,setSaving] = useState(false)
 
 useEffect(()=>{
 loadHospital()
+loadStates()
 },[])
+
+
+/* LOAD STATES */
+
+async function loadStates(){
+
+const {data} = await supabase
+.from("states")
+.select("id,name")
+.order("name")
+
+setStates(data || [])
+
+}
+
+
+/* LOAD CITIES */
+
+async function loadCities(stateId){
+
+const {data} = await supabase
+.from("cities")
+.select("id,name")
+.eq("state_id",stateId)
+.order("name")
+
+setCities(data || [])
+
+}
+
+
+/* LOAD HOSPITAL */
 
 async function loadHospital(){
 
@@ -33,8 +61,8 @@ const {data,error} = await supabase
 id,
 hospital_name,
 hospital_type,
-city,
-state,
+state_id,
+city_id,
 contact_person,
 contact_designation,
 phone,
@@ -51,7 +79,15 @@ return
 
 setHospital(data)
 
+/* load cities for existing state */
+if(data.state_id){
+loadCities(data.state_id)
 }
+
+}
+
+
+/* UPDATE FIELD */
 
 function updateField(field,value){
 
@@ -61,6 +97,21 @@ setHospital(prev=>({
 }))
 
 }
+
+
+/* STATE CHANGE */
+
+function handleStateChange(val){
+
+updateField("state_id",val)
+updateField("city_id","")   // reset city
+
+loadCities(val)
+
+}
+
+
+/* SAVE */
 
 async function saveHospital(){
 
@@ -74,8 +125,8 @@ const {error} = await supabase
 .update({
 hospital_name:hospital.hospital_name,
 hospital_type:hospital.hospital_type,
-city:hospital.city,
-state:hospital.state,
+state_id:hospital.state_id,
+city_id:hospital.city_id,
 contact_person:hospital.contact_person,
 contact_designation:hospital.contact_designation,
 phone:hospital.phone,
@@ -96,9 +147,12 @@ alert("Hospital updated successfully")
 
 }
 
+
+/* DELETE */
+
 async function deleteHospital(){
 
-const confirmDelete = confirm("Are you sure you want to delete this hospital?")
+const confirmDelete = confirm("Delete this hospital?")
 if(!confirmDelete) return
 
 const {error} = await supabase
@@ -117,6 +171,7 @@ router.push("/hospitals")
 
 }
 
+
 if(!hospital){
 
 return(
@@ -127,11 +182,10 @@ Loading hospital...
 
 }
 
+
 return(
 
 <div style={{color:"#0f172a"}}>
-
-{/* Back */}
 
 <div style={{marginBottom:"20px"}}>
 <Link href="/hospitals">← Back to Hospitals</Link>
@@ -147,7 +201,8 @@ maxWidth:"700px"
 
 <h2>Edit Hospital</h2>
 
-{/* Name */}
+
+{/* NAME */}
 
 <p>
 <b>Hospital Name</b><br/>
@@ -158,40 +213,70 @@ style={{width:"100%",padding:"8px"}}
 />
 </p>
 
-{/* Type */}
+
+{/* TYPE */}
 
 <p>
 <b>Hospital Type</b><br/>
-<input
+<select
 value={hospital.hospital_type || ""}
 onChange={(e)=>updateField("hospital_type",e.target.value)}
 style={{width:"100%",padding:"8px"}}
-/>
+>
+<option value="">Select</option>
+<option value="Corporate">Corporate</option>
+<option value="Private">Private</option>
+<option value="Government">Government</option>
+<option value="Trust">Trust</option>
+</select>
 </p>
 
-{/* City */}
 
-<p>
-<b>City</b><br/>
-<input
-value={hospital.city || ""}
-onChange={(e)=>updateField("city",e.target.value)}
-style={{width:"100%",padding:"8px"}}
-/>
-</p>
-
-{/* State */}
+{/* STATE */}
 
 <p>
 <b>State</b><br/>
-<input
-value={hospital.state || ""}
-onChange={(e)=>updateField("state",e.target.value)}
+<select
+value={hospital.state_id || ""}
+onChange={(e)=>handleStateChange(e.target.value)}
 style={{width:"100%",padding:"8px"}}
-/>
+>
+
+<option value="">Select State</option>
+
+{states.map(s=>(
+<option key={s.id} value={s.id}>
+{s.name}
+</option>
+))}
+
+</select>
 </p>
 
-{/* Contact Person */}
+
+{/* CITY */}
+
+<p>
+<b>City</b><br/>
+<select
+value={hospital.city_id || ""}
+onChange={(e)=>updateField("city_id",e.target.value)}
+style={{width:"100%",padding:"8px"}}
+>
+
+<option value="">Select City</option>
+
+{cities.map(c=>(
+<option key={c.id} value={c.id}>
+{c.name}
+</option>
+))}
+
+</select>
+</p>
+
+
+{/* CONTACT */}
 
 <p>
 <b>Contact Person</b><br/>
@@ -202,7 +287,6 @@ style={{width:"100%",padding:"8px"}}
 />
 </p>
 
-{/* Designation */}
 
 <p>
 <b>Designation</b><br/>
@@ -213,7 +297,6 @@ style={{width:"100%",padding:"8px"}}
 />
 </p>
 
-{/* Phone */}
 
 <p>
 <b>Phone</b><br/>
@@ -224,7 +307,6 @@ style={{width:"100%",padding:"8px"}}
 />
 </p>
 
-{/* Email */}
 
 <p>
 <b>Email</b><br/>
@@ -235,7 +317,8 @@ style={{width:"100%",padding:"8px"}}
 />
 </p>
 
-{/* Status */}
+
+{/* STATUS */}
 
 <p>
 <b>Status</b><br/>
@@ -249,7 +332,10 @@ style={{width:"100%",padding:"8px"}}
 </select>
 </p>
 
-{/* Save Button */}
+
+{/* BUTTONS */}
+
+<div style={{marginTop:"20px"}}>
 
 <button
 onClick={saveHospital}
@@ -260,15 +346,12 @@ background:"#2563eb",
 color:"#fff",
 border:"none",
 borderRadius:"6px",
-cursor:"pointer",
 marginRight:"10px"
 }}
 >
 Save Changes
 </button>
 
-{/* Delete Button */}
-{isAdmin && (
 <button
 onClick={deleteHospital}
 style={{
@@ -276,13 +359,14 @@ padding:"10px 18px",
 background:"#ef4444",
 color:"#fff",
 border:"none",
-borderRadius:"6px",
-cursor:"pointer"
+borderRadius:"6px"
 }}
 >
 Delete Hospital
 </button>
-)}
+
+</div>
+
 </div>
 
 </div>
