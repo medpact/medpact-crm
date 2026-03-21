@@ -172,8 +172,7 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 <div style={{border:"1px solid #eee",borderRadius:"8px"}}>
 
 <table width="100%" cellPadding="12">
-
-<thead style={{background:"#f8fafc"}}>
+<thead style={{background:"#f8fafc", textAlign:"left"}}>  
 
 <tr>
 
