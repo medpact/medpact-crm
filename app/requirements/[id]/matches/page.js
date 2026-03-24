@@ -24,7 +24,7 @@ const {data,error} = await supabase
 .select(`
 id,
 specialty_id,
-city,
+preferred_location,
 salary_min,
 salary_max,
 hospitals(hospital_name),
@@ -177,7 +177,7 @@ overflow:"hidden"
 <th align="left">Doctor</th>
 <th align="left">Specialty</th>
 <th align="left">Experience</th>
-<th align="left">City</th>
+<th align="left">Relocation City</th>
 <th align="left">Phone</th>
 <th align="left">Availability</th>  
 <th align="left">Actions</th>
@@ -199,7 +199,7 @@ overflow:"hidden"
 
 <td>{d.experience_years} yrs</td>
 
-<td>{d.city}</td>
+<td>{d.preferred_location}</td>
 
 <td>{d.phone}</td>
 <td>{d.availability_status}</td>
