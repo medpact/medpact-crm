@@ -17,6 +17,8 @@ loadRequirement()
 },[])
 
 
+/* LOAD REQUIREMENT */
+
 async function loadRequirement(){
 
 const {data,error} = await supabase
@@ -24,10 +26,14 @@ const {data,error} = await supabase
 .select(`
 id,
 specialty_id,
-preferred_location,
+city,
 salary_min,
 salary_max,
-hospitals(hospital_name),
+hospitals(
+hospital_name,
+contact_person,
+phone
+),
 specialties(name)
 `)
 .eq("id",id)
@@ -45,6 +51,7 @@ loadDoctors(data)
 }
 
 
+/* LOAD DOCTORS */
 
 async function loadDoctors(req){
 
@@ -54,7 +61,7 @@ const {data,error} = await supabase
 id,
 name,
 experience_years,
-city,
+preferred_location,
 phone,
 availability_status,
 specialty_id,
@@ -72,6 +79,7 @@ setDoctors(data || [])
 }
 
 
+/* SHORTLIST */
 
 async function shortlistDoctor(doctorId){
 
@@ -94,6 +102,7 @@ alert("Doctor shortlisted successfully")
 }
 
 
+/* LOADING */
 
 if(!requirement){
 
@@ -105,6 +114,8 @@ Loading...
 
 }
 
+
+/* UI */
 
 return(
 
@@ -126,15 +137,21 @@ Matches for {requirement.specialties?.name}
 </h2>
 
 
-{/* Requirement Summary */}
+{/* REQUIREMENT SUMMARY */}
 
 <div style={{
 background:"#fff",
 border:"1px solid #e5e7eb",
 borderRadius:"8px",
 padding:"20px",
-marginBottom:"20px"
+marginBottom:"20px",
+display:"flex",
+justifyContent:"space-between"
 }}>
+
+{/* LEFT */}
+
+<div>
 
 <p>
 <b>Hospital:</b> {requirement.hospitals?.hospital_name}
@@ -151,6 +168,23 @@ marginBottom:"20px"
 </div>
 
 
+{/* RIGHT (NEW SECTION) */}
+
+<div>
+
+<p>
+<b>Contact Person:</b> {requirement.hospitals?.contact_person || "-"}
+</p>
+
+<p>
+<b>Phone:</b> {requirement.hospitals?.phone || "-"}
+</p>
+
+</div>
+
+</div>
+
+
 
 <h3>
 
@@ -159,7 +193,7 @@ Matching Doctors ({doctors.length})
 </h3>
 
 
-{/* Doctors Table */}
+{/* TABLE */}
 
 <div style={{
 background:"#fff",
@@ -170,17 +204,17 @@ overflow:"hidden"
 
 <table width="100%" cellPadding="12">
 
-<thead style={{background:"#f8fafc"}}>
+<thead style={{background:"#f8fafc", textAlign:"left"}}>
 
 <tr>
 
-<th align="left">Doctor</th>
-<th align="left">Specialty</th>
-<th align="left">Experience</th>
-<th align="left">Relocation City</th>
-<th align="left">Phone</th>
-<th align="left">Availability</th>  
-<th align="left">Actions</th>
+<th>Doctor</th>
+<th>Specialty</th>
+<th>Experience</th>
+<th>Relocation City</th>
+<th>Phone</th>
+<th>Availability</th>  
+<th>Actions</th>
 
 </tr>
 
@@ -202,7 +236,9 @@ overflow:"hidden"
 <td>{d.preferred_location}</td>
 
 <td>{d.phone}</td>
+
 <td>{d.availability_status}</td>
+
 <td>
 
 <a
@@ -244,5 +280,4 @@ fontSize:"16px"
 </div>
 
 )
-
 }
