@@ -121,6 +121,7 @@ page*pageSize
 async function deleteRequirementGroup(reqs){
 
 if(currentUser !== "nagireddy"){
+  console.log("Logged user:", currentUser) // DEBUG
 alert("Only Mr. Nagireddy can delete the requirement")
 return
 }
