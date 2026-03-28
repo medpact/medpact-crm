@@ -80,6 +80,7 @@ setSending(false)
 if(data.success){
 alert("Report sent successfully to medpact.guntur@gmail.com")
 }else{
+  console.log("API KEY:", process.env.RESEND_API_KEY)
 alert("Failed: " + data.error)
 }
 
