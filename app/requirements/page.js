@@ -50,12 +50,14 @@ const {data,error} = await supabase
 .from("requirements")
 .select(`
 id,
-city,
 entry_date,
 positions,
 specialty_id,
 hospital_id,
-hospitals(hospital_name),
+hospitals(
+  hospital_name,
+  cities(name)
+),
 specialties(name)
 `)
 .order("entry_date",{ascending:false})
@@ -241,7 +243,7 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 
 <td>{formatDate(latestDate)}</td>
 <td>{hospital}</td>
-<td>{reqs[0].city}</td>
+<td>{reqs[0].hospitals?.cities?.name}</td>
 <td>{reqs.length}</td>
 <td>{expanded===hospital ? "▲" : "▼"}</td>
 
@@ -280,7 +282,7 @@ style={{cursor:"pointer", color:"red"}}
 
 <tr key={r.id}>
 <td style={{paddingLeft:"40px"}}>{r.specialties?.name}</td>
-<td>{r.city}</td>
+<td>{r.hospitals?.cities?.name}</td>
 <td>{r.positions}</td>
 <td>
 <Link href={`/requirements/${r.id}/matches`}>
