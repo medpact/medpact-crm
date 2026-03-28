@@ -6,12 +6,15 @@ import Link from "next/link"
 
 export default function RequirementsPage(){
 
-const [isAdmin,setIsAdmin] = useState(false)
+const [isAdmin,setIsAdmin] = useState(null)
 
 useEffect(()=>{
 const user = localStorage.getItem("medpact_user")
+
 if(user?.trim().toLowerCase() === "admin"){
 setIsAdmin(true)
+}else{
+setIsAdmin(false)
 }
 },[])
 
@@ -272,7 +275,7 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 </td>
 
 <td>
-{isAdmin && (
+{isAdmin === true && (
 <button
 onClick={async (e)=>{
 e.stopPropagation()
@@ -285,7 +288,6 @@ const {error} = await supabase
 .eq("id",r.id)
 
 if(error){
-console.log(error)
 alert("Delete failed")
 return
 }
@@ -293,7 +295,7 @@ return
 alert("Deleted successfully")
 loadRequirements()
 }}
-style={{color:"red",border:"none",background:"none"}}
+style={{color:"red",cursor:"pointer"}}
 >
 🗑
 </button>
