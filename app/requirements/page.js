@@ -279,11 +279,18 @@ e.stopPropagation()
 
 if(!confirm("Delete this requirement?")) return
 
-await supabase
+const {error} = await supabase
 .from("requirements")
 .delete()
 .eq("id",r.id)
 
+if(error){
+console.log(error)
+alert("Delete failed")
+return
+}
+
+alert("Deleted successfully")
 loadRequirements()
 }}
 style={{color:"red",border:"none",background:"none"}}
