@@ -69,23 +69,36 @@ async function sendReport(){
 
 setSending(true)
 
+try{
+
 const res = await fetch("/api/send-report",{
-method:"POST"
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+}
 })
+
+if(!res.ok){
+alert("API not reachable")
+setSending(false)
+return
+}
 
 const data = await res.json()
 
-setSending(false)
-
 if(data.success){
-alert("Report sent successfully to medpact.guntur@gmail.com")
+alert("Report sent successfully")
 }else{
-  console.log("API KEY:", process.env.RESEND_API_KEY)
 alert("Failed: " + data.error)
 }
 
+}catch(err){
+alert("Error: " + err.message)
 }
 
+setSending(false)
+
+}
 
 /* DASHBOARD DATA */
 
