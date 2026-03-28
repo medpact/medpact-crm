@@ -30,13 +30,15 @@ loadHospitals()
 loadSpecialties()
 },[])
 
-
-
 async function loadHospitals(){
 
 const {data,error} = await supabase
 .from("hospitals")
-.select("id,hospital_name,city")
+.select(`
+id,
+hospital_name,
+cities(name)
+`)
 .order("hospital_name")
 
 if(error){
