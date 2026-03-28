@@ -22,8 +22,7 @@
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.2",
     "zod": "^4.3.6",
-    "xlsx": "^0.18.5",
-    "nodemailer": "^6.9.13"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
