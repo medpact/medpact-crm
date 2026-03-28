@@ -27,6 +27,8 @@ try{
 /* 🔥 INIT RESEND INSIDE FUNCTION (FIX) */
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+console.log("API KEY:", process.env.RESEND_API_KEY)
+
 /* FETCH */
 
 const {data:doctors} = await supabase.from("doctors").select("*")
@@ -40,8 +42,7 @@ const hospitalCSV = toCSV(hospitals)
 const reqCSV = toCSV(requirements)
 
 /* EMAIL */
-
-await resend.emails.send({
+const result = await resend.emails.send({
 from: "Medpact <onboarding@resend.dev>",
 to: ["medpact.guntur@gmail.com"],
 subject: "Medpact CRM Report",
@@ -52,7 +53,7 @@ attachments: [
 { filename: "requirements.csv", content: reqCSV }
 ]
 })
-
+console.log("RESEND RESULT:", result)
 return NextResponse.json({ success: true })
 
 }catch(err){
