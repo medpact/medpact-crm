@@ -6,18 +6,7 @@ import Link from "next/link"
 
 export default function RequirementsPage(){
 
-const [isAdmin,setIsAdmin] = useState(null)
-
-useEffect(()=>{
-const user = localStorage.getItem("medpact_user")
-
-if(user?.trim().toLowerCase() === "admin"){
-setIsAdmin(true)
-}else{
-setIsAdmin(false)
-}
-},[])
-
+const [currentUser,setCurrentUser] = useState("")
 const [requirements,setRequirements] = useState([])
 const [expanded,setExpanded] = useState(null)
 
@@ -26,25 +15,26 @@ const [page,setPage] = useState(1)
 const pageSize = 20
 
 useEffect(()=>{
+const user = localStorage.getItem("medpact_user") || ""
+setCurrentUser(user.toLowerCase())
+},[])
+
+useEffect(()=>{
 loadRequirements()
 },[])
 
 
-/* FORMAT DATE */
-
 function formatDate(date){
 if(!date) return ""
-
 const d = new Date(date)
 const day = String(d.getDate()).padStart(2,"0")
 const month = String(d.getMonth()+1).padStart(2,"0")
 const year = d.getFullYear()
-
 return `${day}/${month}/${year}`
 }
 
 
-/* LOAD DATA (OPTIMIZED) */
+/* LOAD */
 
 async function loadRequirements(){
 
@@ -56,6 +46,7 @@ city,
 entry_date,
 positions,
 specialty_id,
+hospital_id,
 hospitals(hospital_name),
 specialties(name)
 `)
@@ -66,22 +57,18 @@ console.log(error)
 return
 }
 
-/* 🔥 GET ALL SPECIALTY IDS */
-const specialtyIds = [...new Set(data.map(d=>d.specialty_id))]
+/* MATCH COUNT */
 
-/* 🔥 GET MATCH COUNTS IN ONE QUERY */
 const {data:doctorCounts} = await supabase
 .from("doctors")
-.select("specialty_id", {count:"exact"})
+.select("specialty_id")
 
-/* CREATE MAP */
 const countMap = {}
 
 doctorCounts?.forEach(d=>{
 countMap[d.specialty_id] = (countMap[d.specialty_id] || 0) + 1
 })
 
-/* MERGE MATCH COUNT */
 const finalData = data.map(r=>({
 ...r,
 match_count: countMap[r.specialty_id] || 0
@@ -98,9 +85,7 @@ const grouped = {}
 
 requirements.forEach(r=>{
 const hospital = r.hospitals?.hospital_name || "Unknown"
-
 if(!grouped[hospital]) grouped[hospital]=[]
-
 grouped[hospital].push(r)
 })
 
@@ -108,7 +93,6 @@ grouped[hospital].push(r)
 /* FILTER */
 
 const filteredHospitals = Object.keys(grouped).filter(hospital=>{
-
 const reqs = grouped[hospital]
 
 const hospitalMatch = hospital.toLowerCase().includes(search.toLowerCase())
@@ -119,7 +103,6 @@ const anyReqMatch = reqs.some(r=>
 )
 
 return hospitalMatch || anyReqMatch
-
 })
 
 
@@ -133,11 +116,38 @@ page*pageSize
 )
 
 
+/* DELETE FUNCTION */
+
+async function deleteRequirementGroup(reqs){
+
+if(currentUser !== "nagireddy"){
+alert("Only Mr. Nagireddy can delete the requirement")
+return
+}
+
+if(!confirm("Delete all requirements for this hospital?")) return
+
+const ids = reqs.map(r=>r.id)
+
+const {error} = await supabase
+.from("requirements")
+.delete()
+.in("id",ids)
+
+if(error){
+alert("Delete failed")
+return
+}
+
+alert("Deleted successfully")
+loadRequirements()
+
+}
+
+
 return(
 
 <div style={{color:"#0f172a"}}>
-
-{/* HEADER */}
 
 <div style={{
 display:"flex",
@@ -161,7 +171,6 @@ borderRadius:"6px"
 
 </div>
 
-{/* SEARCH */}
 
 <input
 placeholder="Search hospital, city or specialty..."
@@ -179,7 +188,6 @@ borderRadius:"6px"
 }}
 />
 
-{/* TABLE */}
 
 <div style={{
 border:"1px solid #e5e7eb",
@@ -197,6 +205,7 @@ overflow:"hidden"
 <th>City</th>
 <th>Requirements</th>
 <th>Expand</th>
+<th>Delete</th>
 </tr>
 
 </thead>
@@ -206,8 +215,6 @@ overflow:"hidden"
 {paginatedHospitals.map((hospital)=>{
 
 const reqs = grouped[hospital]
-
-/* 🔥 GET LATEST DATE */
 const latestDate = reqs[0]?.entry_date
 
 return(
@@ -224,14 +231,20 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 >
 
 <td>{formatDate(latestDate)}</td>
-
 <td>{hospital}</td>
-
 <td>{reqs[0].city}</td>
-
 <td>{reqs.length}</td>
-
 <td>{expanded===hospital ? "▲" : "▼"}</td>
+
+<td
+onClick={(e)=>{
+e.stopPropagation()
+deleteRequirementGroup(reqs)
+}}
+style={{cursor:"pointer", color:"red"}}
+>
+🗑
+</td>
 
 </tr>
 
@@ -239,8 +252,7 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 {expanded===hospital && (
 
 <tr>
-
-<td colSpan="5">
+<td colSpan="6">
 
 <table width="100%" cellPadding="10">
 
@@ -250,7 +262,6 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 <th>City</th>
 <th>Positions</th>
 <th>Matches</th>
-<th>Delete</th>
 </tr>
 </thead>
 
@@ -259,49 +270,14 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 {reqs.map((r)=>(
 
 <tr key={r.id}>
-
-<td style={{paddingLeft:"40px"}}>
-{r.specialties?.name}
-</td>
-
+<td style={{paddingLeft:"40px"}}>{r.specialties?.name}</td>
 <td>{r.city}</td>
-
 <td>{r.positions}</td>
-
 <td>
 <Link href={`/requirements/${r.id}/matches`}>
 {r.match_count}
 </Link>
 </td>
-
-<td>
-{isAdmin === true && (
-<button
-onClick={async (e)=>{
-e.stopPropagation()
-
-if(!confirm("Delete this requirement?")) return
-
-const {error} = await supabase
-.from("requirements")
-.delete()
-.eq("id",r.id)
-
-if(error){
-alert("Delete failed")
-return
-}
-
-alert("Deleted successfully")
-loadRequirements()
-}}
-style={{color:"red",cursor:"pointer"}}
->
-🗑
-</button>
-)}
-</td>
-
 </tr>
 
 ))}
@@ -311,7 +287,6 @@ style={{color:"red",cursor:"pointer"}}
 </table>
 
 </td>
-
 </tr>
 
 )}
@@ -328,7 +303,6 @@ style={{color:"red",cursor:"pointer"}}
 
 </div>
 
-{/* PAGINATION */}
 
 <div style={{marginTop:"20px",display:"flex",gap:"6px"}}>
 
