@@ -210,7 +210,7 @@ setHospital(e.target.value)
 const selected = hospitals.find(h=>h.id==e.target.value)
 
 if(selected){
-setCity(selected.city || "")
+setCity(selected.cities?.name || "")
 }
 
 }}
