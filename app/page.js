@@ -80,7 +80,7 @@ setSending(false)
 if(data.success){
 alert("Report sent successfully to medpact.guntur@gmail.com")
 }else{
-alert("Failed to send report")
+alert("Failed: " + data.error)
 }
 
 }
