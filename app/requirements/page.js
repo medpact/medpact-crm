@@ -15,8 +15,16 @@ const [page,setPage] = useState(1)
 const pageSize = 20
 
 useEffect(()=>{
-const user = localStorage.getItem("medpact_user") || ""
-setCurrentUser(user.toLowerCase())
+const userStr = localStorage.getItem("medpact_user")
+
+if(userStr){
+try{
+const userObj = JSON.parse(userStr)
+setCurrentUser(userObj.username?.trim().toLowerCase())
+}catch{
+setCurrentUser("")
+}
+}
 },[])
 
 useEffect(()=>{
