@@ -77,6 +77,7 @@ headers:{
 "Content-Type":"application/json"
 }
 })
+  console.log("Button clicked")
 
 if(!res.ok){
 alert("API not reachable")
