@@ -154,6 +154,30 @@ alert("Deleted successfully")
 loadRequirements()
 
 }
+async function deleteSingleRequirement(id){
+
+if(currentUser !== "nagireddy"){
+alert("Only Mr. Nagireddy can delete the requirement")
+return
+}
+
+if(!confirm("Delete this requirement?")) return
+
+const {error} = await supabase
+.from("requirements")
+.delete()
+.eq("id",id)
+
+if(error){
+alert("Delete failed")
+return
+}
+
+alert("Deleted successfully")
+
+loadRequirements()
+
+}
 
 
 return(
@@ -273,6 +297,7 @@ style={{cursor:"pointer", color:"red"}}
 <th>City</th>
 <th>Positions</th>
 <th>Matches</th>
+<th>Delete</th>
 </tr>
 </thead>
 
@@ -284,11 +309,23 @@ style={{cursor:"pointer", color:"red"}}
 <td style={{paddingLeft:"40px"}}>{r.specialties?.name}</td>
 <td>{r.hospitals?.cities?.name}</td>
 <td>{r.positions}</td>
+
 <td>
 <Link href={`/requirements/${r.id}/matches`}>
 {r.match_count}
 </Link>
 </td>
+
+<td
+onClick={(e)=>{
+e.stopPropagation()
+deleteSingleRequirement(r.id)
+}}
+style={{color:"red", cursor:"pointer"}}
+>
+🗑
+</td>
+
 </tr>
 
 ))}
