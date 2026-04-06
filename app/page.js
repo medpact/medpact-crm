@@ -137,13 +137,13 @@ interview:0,
 offer:0,
 placed:0
 }
-
 shortlists.data?.forEach(s=>{
 if(s.status==="shortlisted") counts.shortlisted++
 if(s.status==="interview_assigned") counts.interview++
 if(s.status==="offer_released") counts.offer++
-if(s.status==="placement_done") counts.placed++
 })
+/* 🔥 PLACEMENTS FROM placements TABLE */
+counts.placed = placements.count || 0
 
 setPipeline(counts)
 
