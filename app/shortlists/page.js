@@ -86,8 +86,9 @@ return
 
 
 /* Placement */
-
 if(newStatus === "placement_done"){
+
+/* STEP 1: INSERT INTO placements */
 
 await supabase
 .from("placements")
@@ -97,10 +98,19 @@ hospital_id:row.requirements.hospital_id,
 joining_date:new Date().toISOString().split("T")[0]
 })
 
+/* STEP 2: UPDATE DOCTOR */
+
 await supabase
 .from("doctors")
 .update({availability_status:"not_available"})
 .eq("id",row.doctor_id)
+
+/* STEP 3: DELETE REQUIREMENT (🔥 IMPORTANT) */
+
+await supabase
+.from("requirements")
+.delete()
+.eq("id",row.requirement_id)
 
 }
 
