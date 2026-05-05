@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase"
+import { useRouter } from "next/navigation"
 
 import {
 Chart as ChartJS,
@@ -28,7 +29,7 @@ BarElement
 )
 
 export default function Dashboard(){
-
+const router = useRouter()
 const [mounted,setMounted] = useState(false)
 const [stats,setStats] = useState({})
 const [pipeline,setPipeline] = useState({})
@@ -46,22 +47,29 @@ labels:[],
 datasets:[]
 })
 
-useEffect(()=>{
+useEffect(() => {
 
-setMounted(true)
-loadDashboard()
+  const host = window.location.hostname
 
-/* GET USER */
-const userStr = localStorage.getItem("medpact_user")
-if(userStr){
-try{
-const userObj = JSON.parse(userStr)
-setCurrentUser(userObj.username?.trim().toLowerCase())
-}catch{}
-}
+  // 🌍 If care domain → go to medical tourism
+  if (host.includes("care.medpact.in")) {
+    router.replace("/medicaltourism")
+    return
+  }
 
-},[])
+  // 📊 If dashboard domain → allow dashboard
+  setMounted(true)
+  loadDashboard()
 
+  const userStr = localStorage.getItem("medpact_user")
+  if(userStr){
+    try{
+      const userObj = JSON.parse(userStr)
+      setCurrentUser(userObj.username?.trim().toLowerCase())
+    }catch{}
+  }
+
+}, [])
 
 /* SEND REPORT */
 
