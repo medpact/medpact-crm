@@ -5,9 +5,9 @@ import { supabase } from "../../lib/supabase"
 
 export default function MedicalTourismPage(){
 
-const [hero,setHero] = useState({})
 const [procedures,setProcedures] = useState([])
 const [testimonials,setTestimonials] = useState([])
+const [doctors,setDoctors] = useState([])
 
 useEffect(()=>{
 loadData()
@@ -15,90 +15,65 @@ loadData()
 
 async function loadData(){
 
-const {data:heroData} = await supabase.from("site_content").select("*")
-let heroObj = {}
-heroData?.forEach(i=> heroObj[i.key] = i.value)
-setHero(heroObj)
-
 const {data:proc} = await supabase.from("procedures").select("*")
 setProcedures(proc || [])
 
 const {data:testi} = await supabase.from("testimonials").select("*")
 setTestimonials(testi || [])
 
+const {data:docs} = await supabase
+.from("doctors")
+.select("id,name,experience_years,specialties(name)")
+.limit(6)
+
+setDoctors(docs || [])
+
+}
+
+function costBar(india, usa){
+const percent = (india / usa) * 100
+return(
+<div style={{marginBottom:"10px"}}>
+<div style={{fontSize:"14px"}}>India vs USA</div>
+<div style={{background:"#eee",height:"10px",borderRadius:"10px"}}>
+<div style={{
+width:`${percent}%`,
+background:"linear-gradient(to right,#22c55e,#16a34a)",
+height:"100%",
+borderRadius:"10px"
+}}/>
+</div>
+</div>
+)
 }
 
 return(
 
-<div style={{fontFamily:"Arial, sans-serif"}}>
+<div style={{fontFamily:"Arial"}}>
 
 {/* HERO */}
 
 <section style={{
 padding:"60px 20px",
 textAlign:"center",
-background:"linear-gradient(to right,#f0f6ff,#ffffff)"
+background:"linear-gradient(135deg,#1e3a8a,#2563eb)",
+color:"#fff"
 }}>
 
-<h1 style={{
-fontSize:"32px",
-fontWeight:"700",
-maxWidth:"700px",
-margin:"auto"
-}}>
-{hero.hero_title || "Affordable World-Class Treatment in India"}
+<h1 style={{fontSize:"34px"}}>
+World-Class Treatment at Affordable Prices
 </h1>
 
-<p style={{
-marginTop:"10px",
-color:"#555",
-fontSize:"16px"
-}}>
-{hero.hero_subtitle || "Save up to 70% on Dental & Cardiac procedures"}
-</p>
-
-<div style={{marginTop:"20px"}}>
-
-<a href="https://wa.me/91XXXXXXXXXX">
-<button style={{
-padding:"14px 24px",
-background:"#2563eb",
-color:"#fff",
-border:"none",
-borderRadius:"8px",
-fontSize:"16px"
-}}>
-Get Free Consultation
-</button>
-</a>
-
-</div>
+<p>Save up to 70% on Dental, Cardiac & Neuro procedures</p>
 
 </section>
 
 
-{/* TRUST */}
+{/* DEPARTMENTS */}
 
-<section style={{
-display:"flex",
-justifyContent:"center",
-gap:"20px",
-flexWrap:"wrap",
-padding:"20px"
-}}>
+<section style={{padding:"40px 20px"}}>
 
-<div>✔ Certified Hospitals</div>
-<div>✔ Experienced Doctors</div>
-<div>✔ International Patients</div>
-
-</section>
-
-
-{/* PROCEDURES */}
-
-<section style={{padding:"40px 20px",textAlign:"center"}}>
-
-<h2>Our Treatments</h2>
+<h2 style={{textAlign:"center"}}>Our Specialities</h2>
 
 <div style={{
 display:"grid",
@@ -107,19 +82,27 @@ gap:"20px",
 marginTop:"20px"
 }}>
 
-{procedures.map(p=>(
-<div key={p.id} style={{
-border:"1px solid #eee",
-padding:"20px",
+{["Dental","Cardiac","Neuro"].map(dep=>(
+<div key={dep} style={{
+background:"#fff",
 borderRadius:"12px",
-background:"#fff"
+padding:"20px",
+boxShadow:"0 4px 12px rgba(0,0,0,0.08)"
 }}>
 
-<h3>{p.name}</h3>
-<p style={{color:"#555"}}>{p.description}</p>
+<h3>{dep}</h3>
+<p>Advanced treatments with expert doctors</p>
 
-<p><b>India:</b> ${p.price_india}</p>
-<p><b>USA:</b> ${p.price_us}</p>
+<button style={{
+marginTop:"10px",
+background:"#2563eb",
+color:"#fff",
+border:"none",
+padding:"10px 15px",
+borderRadius:"6px"
+}}>
+View More →
+</button>
 
 </div>
 ))}
@@ -129,13 +112,39 @@ background:"#fff"
 </section>
 
 
-{/* TESTIMONIALS */}
+{/* COST COMPARISON */}
 
 <section style={{
 padding:"40px 20px",
-background:"#f9fafb",
-textAlign:"center"
+background:"#f9fafb"
 }}>
+
+<h2 style={{textAlign:"center"}}>Cost Comparison</h2>
+
+<div style={{maxWidth:"600px",margin:"auto",marginTop:"20px"}}>
+
+{procedures.slice(0,3).map(p=>(
+<div key={p.id} style={{marginBottom:"20px"}}>
+
+<b>{p.name}</b>
+
+{costBar(p.price_india, p.price_us)}
+
+<p style={{fontSize:"14px"}}>
+India: ${p.price_india} | USA: ${p.price_us}
+</p>
+
+</div>
+))}
+
+</div>
+
+</section>
+
+
+{/* VIDEO TESTIMONIALS */}
+
+<section style={{padding:"40px 20px",textAlign:"center"}}>
 
 <h2>Patient Stories</h2>
 
@@ -146,16 +155,57 @@ gap:"20px",
 marginTop:"20px"
 }}>
 
-{testimonials.map(t=>(
-<div key={t.id} style={{
+{testimonials
+.filter(t=>t.video_url) // only videos
+.slice(0,3)
+.map(t=>(
+<div key={t.id}>
+
+<iframe
+width="100%"
+height="180"
+src={t.video_url}
+title="testimonial"
+style={{borderRadius:"10px"}}
+/>
+
+<p>{t.name}</p>
+
+</div>
+))}
+
+</div>
+
+</section>
+
+
+{/* DOCTORS */}
+
+<section style={{
+padding:"40px 20px",
+background:"#f9fafb"
+}}>
+
+<h2 style={{textAlign:"center"}}>Our Doctors</h2>
+
+<div style={{
+display:"grid",
+gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",
+gap:"20px",
+marginTop:"20px"
+}}>
+
+{doctors.slice(0,6).map(d=>(
+<div key={d.id} style={{
 background:"#fff",
 padding:"20px",
 borderRadius:"12px",
-border:"1px solid #eee"
+boxShadow:"0 4px 10px rgba(0,0,0,0.08)"
 }}>
 
-<p>"{t.message}"</p>
-<small>{t.name} ({t.country})</small>
+<h3>{d.name}</h3>
+<p>{d.specialties?.name}</p>
+<p>{d.experience_years} yrs experience</p>
 
 </div>
 ))}
@@ -167,10 +217,7 @@ border:"1px solid #eee"
 
 {/* CTA */}
 
-<section style={{
-padding:"40px",
-textAlign:"center"
-}}>
+<section style={{padding:"40px",textAlign:"center"}}>
 
 <h2>Start Your Treatment Journey</h2>
 
@@ -178,7 +225,7 @@ textAlign:"center"
 <button style={{
 marginTop:"15px",
 padding:"14px 24px",
-background:"green",
+background:"#22c55e",
 color:"#fff",
 border:"none",
 borderRadius:"8px"
@@ -188,25 +235,6 @@ Chat on WhatsApp
 </a>
 
 </section>
-
-
-{/* FLOAT BUTTON */}
-
-<a
-href="https://wa.me/91XXXXXXXXXX"
-style={{
-position:"fixed",
-bottom:"20px",
-right:"20px",
-background:"#25d366",
-color:"#fff",
-padding:"14px",
-borderRadius:"50px",
-fontSize:"14px"
-}}
->
-Chat
-</a>
 
 </div>
 
