@@ -1,142 +1,105 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 
 export default function MedicalTourismPage(){
 
-const [form,setForm] = useState({
-  name:"",
-  country:"",
-  phone:"",
-  treatment:""
+const [hero,setHero] = useState({})
+const [procedures,setProcedures] = useState([])
+const [testimonials,setTestimonials] = useState([])
+const [pricing,setPricing] = useState([])
+
+useEffect(()=>{
+loadData()
+},[])
+
+async function loadData(){
+
+// HERO
+const {data:heroData} = await supabase
+.from("site_content")
+.select("*")
+
+let heroObj = {}
+heroData?.forEach(i=>{
+heroObj[i.key] = i.value
 })
+setHero(heroObj)
 
-const [loading,setLoading] = useState(false)
-const [message,setMessage] = useState("")
+// PROCEDURES
+const {data:proc} = await supabase
+.from("procedures")
+.select("*")
+setProcedures(proc || [])
 
-async function handleSubmit(e){
-  e.preventDefault()
+// TESTIMONIALS
+const {data:testi} = await supabase
+.from("testimonials")
+.select("*")
+setTestimonials(testi || [])
 
-  setLoading(true)
+// PRICING
+const {data:price} = await supabase
+.from("pricing")
+.select("*")
+setPricing(price || [])
 
-  const {error} = await supabase
-  .from("leads")
-  .insert([form])
-
-  if(error){
-    setMessage("Something went wrong")
-  }else{
-    setMessage("Submitted successfully")
-    setForm({name:"",country:"",phone:"",treatment:""})
-  }
-
-  setLoading(false)
 }
 
 return(
 
-<div style={{fontFamily:"Arial, sans-serif"}}>
+<div style={{fontFamily:"Arial"}}>
 
 {/* HERO */}
 
-<div style={{
-background:"#f0f6ff",
-padding:"60px 20px",
-textAlign:"center"
-}}>
-<h1 style={{fontSize:"36px"}}>
-Affordable World-Class Treatment in India
-</h1>
+<div style={{padding:"60px",textAlign:"center",background:"#f0f6ff"}}>
 
-<p style={{marginTop:"10px",color:"#555"}}>
-Save up to 70% on Dental & Cardiac procedures
-</p>
+<h1>{hero.hero_title || "Affordable Treatment in India"}</h1>
+<p>{hero.hero_subtitle || "Save up to 70%"}</p>
 
-<div style={{marginTop:"20px"}}>
-<button style={{
-padding:"12px 20px",
-background:"#2563eb",
-color:"#fff",
-border:"none",
-borderRadius:"6px",
-marginRight:"10px"
-}}>
+<a href="https://wa.me/91XXXXXXXXXX">
+<button style={{padding:"12px 20px",background:"#2563eb",color:"#fff",border:"none",borderRadius:"6px"}}>
 Get Free Consultation
 </button>
-
-<a href="https://wa.me/91XXXXXXXXXX" target="_blank">
-<button style={{
-padding:"12px 20px",
-background:"green",
-color:"#fff",
-border:"none",
-borderRadius:"6px"
-}}>
-WhatsApp
-</button>
 </a>
-</div>
-</div>
 
-
-{/* TRUST */}
-
-<div style={{
-display:"flex",
-justifyContent:"center",
-gap:"40px",
-padding:"20px",
-borderBottom:"1px solid #eee"
-}}>
-<div>✔ 500+ Patients</div>
-<div>✔ Certified Hospitals</div>
-<div>✔ Experienced Doctors</div>
 </div>
 
 
-{/* TREATMENTS */}
+{/* PROCEDURES */}
 
 <div style={{padding:"40px",textAlign:"center"}}>
 
-<h2>Our Specialities</h2>
+<h2>Our Treatments</h2>
 
-<div style={{
-display:"flex",
-justifyContent:"center",
-gap:"30px",
-marginTop:"20px"
-}}>
+<div style={{display:"flex",gap:"20px",justifyContent:"center",flexWrap:"wrap"}}>
 
-<div style={{border:"1px solid #eee",padding:"20px",borderRadius:"10px",width:"250px"}}>
-<h3>Dental Care</h3>
-<p>Implants, Root Canal, Smile Makeover</p>
+{procedures.map(p=>(
+<div key={p.id} style={{border:"1px solid #eee",padding:"20px",width:"250px"}}>
+<h3>{p.name}</h3>
+<p>{p.description}</p>
+<p><b>India:</b> ${p.price_india}</p>
+<p><b>USA:</b> ${p.price_us}</p>
 </div>
+))}
 
-<div style={{border:"1px solid #eee",padding:"20px",borderRadius:"10px",width:"250px"}}>
-<h3>Cardiac Care</h3>
-<p>TAVR, Bypass Surgery, Angioplasty</p>
 </div>
 
 </div>
-</div>
 
 
-{/* COST COMPARISON */}
+{/* PRICING */}
 
-<div style={{
-padding:"40px",
-background:"#fafafa",
-textAlign:"center"
-}}>
+<div style={{padding:"40px",background:"#fafafa",textAlign:"center"}}>
 
 <h2>Cost Comparison</h2>
 
-<table style={{margin:"20px auto",borderCollapse:"collapse"}} cellPadding="10">
+<table style={{margin:"auto",borderCollapse:"collapse"}} cellPadding="10">
 
-<thead style={{background:"#f1f5f9"}}>
+<thead>
 <tr>
-<th>Procedure</th>
+<th>Treatment</th>
 <th>USA</th>
 <th>Europe</th>
 <th>India</th>
@@ -144,19 +107,16 @@ textAlign:"center"
 </thead>
 
 <tbody>
-<tr>
-<td>Root Canal</td>
-<td>$1200</td>
-<td>€800</td>
-<td>$100</td>
-</tr>
 
-<tr>
-<td>TAVR</td>
-<td>$60,000</td>
-<td>€50,000</td>
-<td>$35,000</td>
+{pricing.map(p=>(
+<tr key={p.id}>
+<td>{p.treatment}</td>
+<td>{p.usa}</td>
+<td>{p.europe}</td>
+<td>{p.india}</td>
 </tr>
+))}
+
 </tbody>
 
 </table>
@@ -164,111 +124,26 @@ textAlign:"center"
 </div>
 
 
-{/* HOW IT WORKS */}
+{/* TESTIMONIALS */}
 
 <div style={{padding:"40px",textAlign:"center"}}>
 
-<h2>How It Works</h2>
-
-<div style={{
-display:"flex",
-justifyContent:"center",
-gap:"20px",
-marginTop:"20px"
-}}>
-
-<div>1. Share Reports</div>
-<div>2. Get Consultation</div>
-<div>3. Travel to India</div>
-<div>4. Treatment & Recovery</div>
-
-</div>
-
-</div>
-
-
-{/* LEAD FORM */}
-
-<div style={{
-maxWidth:"600px",
-margin:"auto",
-padding:"20px",
-border:"1px solid #eee",
-borderRadius:"10px"
-}}>
-
-<h3>Get Free Consultation</h3>
-
-<form onSubmit={handleSubmit}>
-
-<input
-placeholder="Name"
-value={form.name}
-onChange={(e)=>setForm({...form,name:e.target.value})}
-style={{width:"100%",padding:"8px",marginBottom:"10px"}}
-/>
-
-<input
-placeholder="Country"
-value={form.country}
-onChange={(e)=>setForm({...form,country:e.target.value})}
-style={{width:"100%",padding:"8px",marginBottom:"10px"}}
-/>
-
-<input
-placeholder="Phone"
-value={form.phone}
-onChange={(e)=>setForm({...form,phone:e.target.value})}
-style={{width:"100%",padding:"8px",marginBottom:"10px"}}
-/>
-
-<select
-value={form.treatment}
-onChange={(e)=>setForm({...form,treatment:e.target.value})}
-style={{width:"100%",padding:"8px",marginBottom:"10px"}}
->
-<option value="">Select Treatment</option>
-<option value="Dental">Dental</option>
-<option value="Cardiac">Cardiac</option>
-</select>
-
-<button style={{
-padding:"10px 16px",
-background:"#2563eb",
-color:"#fff",
-border:"none",
-borderRadius:"6px"
-}}>
-Submit
-</button>
-
-</form>
-
-{message && <p>{message}</p>}
-
-</div>
-
-
-{/* TESTIMONIALS */}
-
-<div style={{
-padding:"40px",
-textAlign:"center"
-}}>
-
 <h2>Patient Stories</h2>
 
-<p>"I saved $40,000 on heart surgery in India!"</p>
-<p>"Excellent dental care and smooth experience"</p>
+{testimonials.map(t=>(
+<div key={t.id} style={{marginBottom:"15px"}}>
+<p>"{t.message}"</p>
+<small>{t.name} ({t.country})</small>
+</div>
+))}
 
 </div>
 
 
-{/* WHATSAPP FLOAT */}
+{/* WHATSAPP */}
 
 <a
 href="https://wa.me/91XXXXXXXXXX"
-target="_blank"
 style={{
 position:"fixed",
 bottom:"20px",
