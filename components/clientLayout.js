@@ -9,13 +9,13 @@ export default function ClientLayout({ children }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  const [loading, setLoading] = useState(true)
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
 
     const user = localStorage.getItem("medpact_user")
 
-    // 🔒 Protect everything EXCEPT public pages
+    // 🔒 Protect everything except public pages
     if (
       !user &&
       !pathname.startsWith("/medicaltourism") &&
@@ -24,14 +24,12 @@ export default function ClientLayout({ children }) {
       router.push("/login")
     }
 
-    setLoading(false)
+    setChecked(true)
 
   }, [pathname])
 
-  // ⏳ Loading state
-  if (loading) {
-    return <div style={{ padding: "40px" }}>Loading...</div>
-  }
+  // ⏳ Wait until auth check completes
+  if (!checked) return null
 
   // 🌍 Public pages (no sidebar)
   if (
@@ -41,23 +39,13 @@ export default function ClientLayout({ children }) {
     return children
   }
 
-  // 🔒 Protected dashboard layout
+  // 🔒 Protected layout
   return (
-    <div style={{
-      display: "flex",
-      minHeight: "100vh"
-    }}>
-
+    <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
-
-      <div style={{
-        flex: 1,
-        padding: "30px",
-        background: "#f8fafc"
-      }}>
+      <div style={{ flex: 1, padding: "30px", background: "#f8fafc" }}>
         {children}
       </div>
-
     </div>
   )
 }
