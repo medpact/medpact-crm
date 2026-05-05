@@ -15,8 +15,9 @@ useEffect(()=>{
 
 const user = localStorage.getItem("medpact_user")
 
-if(!user && pathname !== "/login"){
-router.push("/login")
+// ✅ Only protect dashboard
+if (!user && pathname.startsWith("/dashboard")) {
+  router.push("/login")
 }
 
 setLoading(false)
@@ -28,8 +29,12 @@ if(loading){
 return <div style={{padding:"40px"}}>Loading...</div>
 }
 
-if(pathname === "/login"){
-return children
+// ✅ Hide sidebar for public pages
+if(
+  pathname === "/login" ||
+  pathname.startsWith("/medicaltourism")
+){
+  return children
 }
 
 return(
