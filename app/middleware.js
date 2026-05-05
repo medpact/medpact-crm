@@ -4,10 +4,11 @@ export function middleware(request) {
   const host = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
 
-  console.log("HOST:", host)
-  console.log("PATH:", pathname)
+  // Normalize host (remove port if exists)
+  const cleanHost = host.split(':')[0]
 
-  if (host.includes('care.medpact.in')) {
+  // 🌍 Medical Tourism Domain
+  if (cleanHost === 'care.medpact.in') {
     const path = pathname === "/" ? "" : pathname
 
     return NextResponse.rewrite(
@@ -15,7 +16,8 @@ export function middleware(request) {
     )
   }
 
-  if (host.includes('dashboard.medpact.in')) {
+  // 📊 Dashboard Domain
+  if (cleanHost === 'dashboard.medpact.in') {
     return NextResponse.next()
   }
 
