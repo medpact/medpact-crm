@@ -8,7 +8,7 @@ export default function HospitalsPage(){
 
 const [hospitals,setHospitals] = useState([])
 const [page,setPage] = useState(1)
-
+const [search, setSearch] = useState("")
 const pageSize = 25
 
 useEffect(()=>{
@@ -50,14 +50,25 @@ if(status==="inactive") return "#ef4444"
 return "#64748b"
 
 }
+const filteredHospitals = hospitals.filter((h) => {
+  const term = search.toLowerCase()
 
+  return (
+    (h.hospital_name || "").toLowerCase().includes(term) ||
+    (h.hospital_type || "").toLowerCase().includes(term) ||
+    (h.contact_person || "").toLowerCase().includes(term) ||
+    (h.phone || "").toLowerCase().includes(term) ||
+    (h.cities?.name || "").toLowerCase().includes(term) ||
+    (h.states?.name || "").toLowerCase().includes(term)
+  )
+})
 /* PAGINATION */
 
-const totalPages = Math.ceil(hospitals.length / pageSize)
+const totalPages = Math.ceil(filteredHospitals.length / pageSize)
 
-const paginated = hospitals.slice(
-(page-1)*pageSize,
-page*pageSize
+const paginated = filteredHospitals.slice(
+  (page - 1) * pageSize,
+  page * pageSize
 )
 
 return(
@@ -85,7 +96,21 @@ borderRadius:"6px"
 </Link>
 
 </div>
-
+<input
+  placeholder="Search hospital, city, state, contact..."
+  value={search}
+  onChange={(e) => {
+    setSearch(e.target.value)
+    setPage(1)
+  }}
+  style={{
+    marginBottom:"20px",
+    padding:"8px",
+    width:"350px",
+    border:"1px solid #ddd",
+    borderRadius:"6px"
+  }}
+/>
 <div style={{
 background:"#fff",
 border:"1px solid #e5e7eb",
