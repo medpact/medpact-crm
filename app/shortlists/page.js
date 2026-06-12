@@ -5,7 +5,7 @@ import { supabase } from "../../lib/supabase"
 import Link from "next/link"
 
 export default function ShortlistsPage(){
-
+const [search,setSearch] = useState("")
 const [shortlists,setShortlists] = useState([])
 
 useEffect(()=>{
@@ -30,10 +30,9 @@ return `${day}/${month}/${year}`
 /* FETCH */
 
 async function fetchShortlists(){
-
-const {data,error} = await supabase
-.from("shortlists")
-.select(`
+  const { data, error } = await supabase
+  .from("shortlists")
+  .select(`
 id,
 doctor_id,
 requirement_id,
@@ -55,8 +54,12 @@ hospitals(hospital_name),
 specialties(name)
 )
 `)
-.order("created_at",{ascending:false})
+  .neq("status","rejected")
+.neq("status","placement_done")
+  .order("created_at",{ascending:false})
 
+
+  
 if(error){
 console.log(error)
 return
@@ -90,13 +93,18 @@ if(newStatus === "placement_done"){
 
 /* STEP 1: INSERT INTO placements */
 
-await supabase
+const { error: placementError } = await supabase
 .from("placements")
 .insert({
-doctor_id:row.doctor_id,
-hospital_id:row.requirements.hospital_id,
-joining_date:new Date().toISOString().split("T")[0]
+  doctor_id: row.doctor_id,
+  hospital_id: row.requirements.hospital_id,
+  joining_date: new Date().toISOString().split("T")[0]
 })
+
+if (placementError) {
+  alert("Failed to create placement")
+  return
+}
 
 /* STEP 2: UPDATE DOCTOR */
 
@@ -123,8 +131,18 @@ fetchShortlists()
 
 async function rejectCandidate(row){
 
-const reason = prompt("Enter rejection reason (Doctor / Hospital):")
-if(!reason) return
+const reason = prompt(
+  "Enter rejection reason (Mandatory):"
+)
+
+if(!reason || !reason.trim()){
+  alert("Rejection reason is mandatory")
+  return
+}
+
+const hospitalName =
+row.requirements?.hospitals?.hospital_name ||
+"Unknown Hospital"
 
 const {data:doctorData} = await supabase
 .from("doctors")
@@ -132,17 +150,17 @@ const {data:doctorData} = await supabase
 .eq("id",row.doctor_id)
 .single()
 
-const hospitalName = row.requirements?.hospitals?.hospital_name || "Unknown Hospital"
+const d = new Date()
 
-const today = new Date().toISOString().split("T")[0]
+const formattedDate =
+`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`
 
 const newRemark =
-`${today} | ${hospitalName} | ${reason}`
+`${formattedDate} | ${hospitalName} | Rejected | ${reason}`
 
 const updatedRemarks = doctorData?.remarks
 ? doctorData.remarks + "\n" + newRemark
 : newRemark
-
 
 await supabase
 .from("shortlists")
@@ -151,7 +169,6 @@ status:"rejected",
 remarks:reason
 })
 .eq("id",row.id)
-
 
 await supabase
 .from("doctors")
@@ -163,7 +180,6 @@ remarks:updatedRemarks
 fetchShortlists()
 
 }
-
 
 /* STATUS COLOR */
 
@@ -199,6 +215,8 @@ Reject
 )
 }
 
+
+  
 if(row.status === "interview_assigned"){
 return(
 <>
@@ -244,7 +262,41 @@ Reject
 return "-"
 }
 
+const filteredShortlists = shortlists.filter(s=>{
 
+const term = search.toLowerCase()
+
+return (
+(s.doctors?.name || "")
+.toLowerCase()
+.includes(term)
+
+||
+
+(s.doctors?.specialties?.name || "")
+.toLowerCase()
+.includes(term)
+
+||
+
+(s.requirements?.hospitals?.hospital_name || "")
+.toLowerCase()
+.includes(term)
+
+||
+
+(s.requirements?.specialties?.name || "")
+.toLowerCase()
+.includes(term)
+
+||
+
+(s.requirements?.city || "")
+.toLowerCase()
+.includes(term)
+)
+
+})
 /* UI */
 
 return(
@@ -255,6 +307,26 @@ return(
 Recruitment Pipeline
 </h2>
 
+<input
+placeholder="Search doctor, hospital, specialty, city..."
+value={search}
+onChange={(e)=>setSearch(e.target.value)}
+style={{
+marginBottom:"20px",
+padding:"8px",
+width:"350px",
+border:"1px solid #ddd",
+borderRadius:"6px"
+}}
+/>
+<div style={{
+marginBottom:"10px",
+fontSize:"14px",
+color:"#64748b"
+}}>
+Showing {filteredShortlists.length} active candidate(s)
+</div>
+  
 <div style={{
 background:"#fff",
 border:"1px solid #e5e7eb",
@@ -282,7 +354,7 @@ overflow:"hidden"
 
 <tbody>
 
-{shortlists.map(s=>(
+{filteredShortlists.map(s=>(
 
 <tr key={s.id} style={{borderTop:"1px solid #e5e7eb"}}>
 
@@ -319,10 +391,10 @@ background:statusColor(s.status)
 </td>
 
 <td>
-
 <a
 href={`https://wa.me/91${s.doctors?.phone}`}
 target="_blank"
+rel="noopener noreferrer"
 style={{marginRight:"10px"}}
 >
 💬
