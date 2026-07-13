@@ -223,18 +223,15 @@ const { data:reqStates } = await supabase
 .select(`
 hospital_id,
 hospitals(
-state_id,
-states(name)
+state
 )
 `)
-
 const { data:placementStates } = await supabase
 .from("placements")
 .select(`
 hospital_id,
 hospitals(
-state_id,
-states(name)
+state
 )
 `)
 
@@ -245,8 +242,8 @@ let stateMap = {}
 reqStates?.forEach(r=>{
 
 const state =
-r.hospitals?.states?.name || "Unknown"
-
+r.hospitals?.state || "Unknown"
+  
 if(!stateMap[state]){
 
 stateMap[state]={
@@ -264,9 +261,8 @@ stateMap[state].requirements++
 /* Placements */
 
 placementStates?.forEach(p=>{
-
 const state =
-p.hospitals?.states?.name || "Unknown"
+p.hospitals?.state || "Unknown"
 
 if(!stateMap[state]){
 
