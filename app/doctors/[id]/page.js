@@ -21,10 +21,11 @@ const { id } = useParams()
 const [doctor,setDoctor] = useState(null)
 const [specialties,setSpecialties] = useState([])
 const [saving,setSaving] = useState(false)
-
+const [timeline,setTimeline] = useState([])
 useEffect(()=>{
 loadDoctor()
 loadSpecialties()
+loadTimeline()
 },[])
 
 async function loadDoctor(){
@@ -68,7 +69,32 @@ const {data} = await supabase
 setSpecialties(data || [])
 
 }
+async function loadTimeline(){
 
+const {data,error} = await supabase
+.from("shortlists")
+.select(`
+id,
+status,
+remarks,
+created_at,
+requirements(
+hospital_id,
+hospitals(hospital_name),
+specialties(name)
+)
+`)
+.eq("doctor_id",id)
+.order("created_at",{ascending:false})
+
+if(error){
+console.log(error)
+return
+}
+
+setTimeline(data || [])
+
+}
 function updateField(field,value){
 
 setDoctor(prev=>({
@@ -351,6 +377,87 @@ Delete Doctor
 </button>
 )}
 </div>
+  <hr style={{margin:"30px 0"}}/>
+
+<h3>Recruitment Timeline</h3>
+
+{timeline.length===0 && (
+
+<p>No recruitment history.</p>
+
+)}
+
+{timeline.map(t=>(
+
+<div
+key={t.id}
+style={{
+border:"1px solid #e5e7eb",
+padding:"15px",
+marginBottom:"12px",
+borderRadius:"8px"
+}}
+>
+
+<div
+style={{
+display:"inline-block",
+padding:"4px 10px",
+borderRadius:"20px",
+background:timelineColor(t.status),
+color:"#fff",
+fontSize:"12px",
+marginBottom:"10px"
+}}
+>
+
+{t.status.replaceAll("_"," ")}
+
+</div>
+
+<p>
+
+<b>Hospital:</b>
+
+{" "}
+
+{t.requirements?.hospitals?.hospital_name}
+
+</p>
+
+<p>
+
+<b>Specialty:</b>
+
+{" "}
+
+{t.requirements?.specialties?.name}
+
+</p>
+
+<p>
+
+<b>Date:</b>
+
+{" "}
+
+{formatDate(t.created_at)}
+
+</p>
+
+<p>
+
+<b>Remarks:</b>
+
+{" "}
+
+{t.remarks || "-"}
+
+</p>
+
+</div>
+
+))}
 </div>
 
 )
