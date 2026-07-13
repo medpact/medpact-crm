@@ -83,7 +83,72 @@ setDoctors(data || [])
 
 async function shortlistDoctor(doctorId){
 
-const {error} = await supabase
+/* STEP 1 - Get Requirement Details */
+
+const { data:reqData, error:reqError } = await supabase
+.from("requirements")
+.select("hospital_id,specialty_id")
+.eq("id",id)
+.single()
+
+if(reqError){
+alert("Unable to load requirement")
+return
+}
+
+/* STEP 2 - Check Existing Active Shortlist */
+
+const { data:existing } = await supabase
+.from("shortlists")
+.select(`
+id,
+status,
+created_at,
+requirements(
+hospital_id,
+specialty_id,
+hospitals(hospital_name)
+)
+`)
+.eq("doctor_id",doctorId)
+
+if(existing){
+
+const duplicate = existing.find(s=>
+s.requirements?.hospital_id === reqData.hospital_id &&
+s.requirements?.specialty_id === reqData.specialty_id &&
+!["rejected","closed","placement_done"].includes(s.status)
+)
+
+if(duplicate){
+
+const date = new Date(duplicate.created_at)
+
+const formatted =
+`${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`
+
+alert(
+`This doctor is already shortlisted.
+
+Hospital:
+${duplicate.requirements?.hospitals?.hospital_name}
+
+Status:
+${duplicate.status.replaceAll("_"," ")}
+
+Shortlisted On:
+${formatted}`
+)
+
+return
+
+}
+
+}
+
+/* STEP 3 - Insert */
+
+const { error } = await supabase
 .from("shortlists")
 .insert({
 doctor_id:doctorId,
@@ -92,7 +157,7 @@ status:"shortlisted"
 })
 
 if(error){
-console.log("Shortlist error:",error)
+console.log(error)
 alert("Error shortlisting doctor")
 return
 }
