@@ -217,41 +217,36 @@ backgroundColor:"#8b5cf6"
 })
 
 /* REQUIREMENTS & PLACEMENTS BY STATE */
+const { data:allHospitals } = await supabase
+.from("hospitals")
+.select("id,state")
 
 const { data:reqStates } = await supabase
 .from("requirements")
-.select(`
-hospital_id,
-hospitals!requirements_hospital_id_fkey(
-state
-)
-`)
+.select("hospital_id")
+
 const { data:placementStates } = await supabase
 .from("placements")
-.select(`
-hospital_id,
-hospitals!placements_hospital_id_fkey(
-state
-)
-`)
+.select("hospital_id")
+let hospitalStateMap = {}
 
+allHospitals?.forEach(h => {
+  hospitalStateMap[h.id] = h.state
+})
 let stateMap = {}
 
 /* Requirements */
-
-reqStates?.forEach(r=>{
+reqStates?.forEach(r => {
 
 const state =
-r.hospitals?.state || "Unknown"
-  
-if(!stateMap[state]){
+hospitalStateMap[r.hospital_id] || "Unknown"
 
+if(!stateMap[state]){
 stateMap[state]={
 state,
 requirements:0,
 placements:0
 }
-
 }
 
 stateMap[state].requirements++
@@ -259,33 +254,22 @@ stateMap[state].requirements++
 })
 
 /* Placements */
+placementStates?.forEach(p => {
 
-placementStates?.forEach(p=>{
 const state =
-p.hospitals?.state || "Unknown"
+hospitalStateMap[p.hospital_id] || "Unknown"
 
 if(!stateMap[state]){
-
 stateMap[state]={
 state,
 requirements:0,
 placements:0
 }
-
 }
 
 stateMap[state].placements++
 
 })
-
-setStateSummary(
-
-Object.values(stateMap)
-
-.sort((a,b)=>b.requirements-a.requirements)
-
-)
-}
 /* UI */
 
 function card(title,value,color){
