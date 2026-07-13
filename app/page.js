@@ -46,7 +46,7 @@ const [hospitalChart,setHospitalChart] = useState({
 labels:[],
 datasets:[]
 })
-const [requirementsByState,setRequirementsByState] = useState({})
+const [stateSummary,setStateSummary] = useState([])
 useEffect(() => {
 
   const host = window.location.hostname
@@ -216,33 +216,79 @@ backgroundColor:"#8b5cf6"
 }]
 })
 
-/* REQUIREMENTS BY STATE */
+/* REQUIREMENTS & PLACEMENTS BY STATE */
 
 const { data:reqStates } = await supabase
 .from("requirements")
 .select(`
 hospital_id,
 hospitals(
+state_id,
+states(name)
+)
+`)
+
+const { data:placementStates } = await supabase
+.from("placements")
+.select(`
+hospital_id,
+hospitals(
+state_id,
 states(name)
 )
 `)
 
 let stateMap = {}
 
+/* Requirements */
+
 reqStates?.forEach(r=>{
 
 const state =
 r.hospitals?.states?.name || "Unknown"
 
-stateMap[state] =
-(stateMap[state] || 0) + 1
+if(!stateMap[state]){
 
-})
-
-setRequirementsByState(stateMap)
+stateMap[state]={
+state,
+requirements:0,
+placements:0
+}
 
 }
 
+stateMap[state].requirements++
+
+})
+
+/* Placements */
+
+placementStates?.forEach(p=>{
+
+const state =
+p.hospitals?.states?.name || "Unknown"
+
+if(!stateMap[state]){
+
+stateMap[state]={
+state,
+requirements:0,
+placements:0
+}
+
+}
+
+stateMap[state].placements++
+
+})
+
+setStateSummary(
+
+Object.values(stateMap)
+
+.sort((a,b)=>b.requirements-a.requirements)
+
+)
 
 /* UI */
 
@@ -326,56 +372,61 @@ borderRadius:"6px"
 
 
 {/* CARDS */}
+{card("Requirements",stats.requirements,"#f59e0b")}
+{card("Shortlisted",stats.shortlists,"#8b5cf6")}
+{card("Placements",stats.placements,"#22c55e")}
 
-<div style={{
+</div>
+
+
+<h3 style={{marginBottom:"20px"}}>
+Requirements by State
+</h3>
+
+<div
+style={{
 display:"flex",
-gap:"20px",
 flexWrap:"wrap",
+gap:"20px",
 marginBottom:"40px"
-}}>
+}}
+>
 
-{card("Doctors",stats.doctors,"#2563eb")}
-{card("Hospitals",stats.hospitals,"#16a34a")}
-<div style={{
+{stateSummary.map(s=>(
+
+<div
+key={s.state}
+style={{
 background:"#fff",
 border:"1px solid #e5e7eb",
 borderRadius:"10px",
-padding:"20px",
+padding:"18px",
 width:"220px"
-}}>
+}}
+>
 
-<h4 style={{margin:0,color:"#64748b"}}>
-Requirements
+<h4 style={{
+marginTop:0,
+marginBottom:"15px"
+}}>
+{s.state}
 </h4>
 
-<h2 style={{marginTop:"10px",color:"#f59e0b"}}>
-{stats.requirements}
-</h2>
+<p style={{margin:"8px 0"}}>
+<b>Open Requirements</b><br/>
+{s.requirements}
+</p>
 
-<div style={{
-marginTop:"10px",
-fontSize:"13px",
-lineHeight:"22px"
-}}>
-
-{Object.entries(requirementsByState).map(([state,count])=>(
-
-<div key={state}>
-
-<b>{state}</b> : {count}
+<p style={{margin:"8px 0"}}>
+<b>Placements</b><br/>
+{s.placements}
+</p>
 
 </div>
 
 ))}
 
 </div>
-
-</div>
-{card("Shortlisted",stats.shortlists,"#8b5cf6")}
-{card("Placements",stats.placements,"#22c55e")}
-
-</div>
-
 
 {mounted && (
 
