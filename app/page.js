@@ -222,7 +222,7 @@ const { data:reqStates } = await supabase
 .from("requirements")
 .select(`
 hospital_id,
-hospitals(
+hospitals!requirements_hospital_id_fkey(
 state
 )
 `)
@@ -230,7 +230,7 @@ const { data:placementStates } = await supabase
 .from("placements")
 .select(`
 hospital_id,
-hospitals(
+hospitals!placements_hospital_id_fkey(
 state
 )
 `)
