@@ -219,17 +219,27 @@ backgroundColor:"#8b5cf6"
 /* REQUIREMENTS & PLACEMENTS BY STATE */
 
 // Fetch all hospitals
-const { data: hospitalsData } = await supabase
+const { data: hospitalsData, error } = await supabase
 .from("hospitals")
-.select("id,state")
+.select(`
+id,
+states!fk_hospital_state (
+  name
+)
+`)
+
+console.log(hospitalsData)
+console.log(error)
 
 // Build hospital -> state map
 const hospitalStateMap = {}
 
 hospitalsData?.forEach(h => {
-  hospitalStateMap[h.id] = h.state || "Unknown"
-})
 
+    hospitalStateMap[h.id] =
+        h.states?.name || "Unknown"
+
+})
 // Fetch requirement hospital ids
 const { data: requirementsData } = await supabase
 .from("requirements")
