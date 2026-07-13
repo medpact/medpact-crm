@@ -385,7 +385,7 @@ marginBottom:"40px"
 {card("Shortlisted",stats.shortlists,"#8b5cf6")}
 {card("Placements",stats.placements,"#22c55e")}
 
-
+</div>
 
 <h3 style={{marginBottom:"20px"}}>
 Requirements by State
