@@ -289,7 +289,7 @@ Object.values(stateMap)
 .sort((a,b)=>b.requirements-a.requirements)
 
 )
-
+}
 /* UI */
 
 function card(title,value,color){
@@ -370,13 +370,21 @@ borderRadius:"6px"
 
 </div>
 
-
 {/* CARDS */}
+
+<div style={{
+display:"flex",
+gap:"20px",
+flexWrap:"wrap",
+marginBottom:"40px"
+}}>
+
+{card("Doctors",stats.doctors,"#2563eb")}
+{card("Hospitals",stats.hospitals,"#16a34a")}
 {card("Requirements",stats.requirements,"#f59e0b")}
 {card("Shortlisted",stats.shortlists,"#8b5cf6")}
 {card("Placements",stats.placements,"#22c55e")}
 
-</div>
 
 
 <h3 style={{marginBottom:"20px"}}>
