@@ -217,59 +217,68 @@ backgroundColor:"#8b5cf6"
 })
 
 /* REQUIREMENTS & PLACEMENTS BY STATE */
-const { data:allHospitals } = await supabase
+
+// Fetch all hospitals
+const { data: hospitalsData } = await supabase
 .from("hospitals")
 .select("id,state")
 
-const { data:reqStates } = await supabase
+// Build hospital -> state map
+const hospitalStateMap = {}
+
+hospitalsData?.forEach(h => {
+  hospitalStateMap[h.id] = h.state || "Unknown"
+})
+
+// Fetch requirement hospital ids
+const { data: requirementsData } = await supabase
 .from("requirements")
 .select("hospital_id")
 
-const { data:placementStates } = await supabase
+// Fetch placement hospital ids
+const { data: placementsData } = await supabase
 .from("placements")
 .select("hospital_id")
-let hospitalStateMap = {}
 
-allHospitals?.forEach(h => {
-  hospitalStateMap[h.id] = h.state
-})
-let stateMap = {}
+const stateMap = {}
 
-/* Requirements */
-reqStates?.forEach(r => {
+// Count Requirements
+requirementsData?.forEach(r => {
 
-const state =
-hospitalStateMap[r.hospital_id] || "Unknown"
+  const state = hospitalStateMap[r.hospital_id] || "Unknown"
 
-if(!stateMap[state]){
-stateMap[state]={
-state,
-requirements:0,
-placements:0
-}
-}
+  if(!stateMap[state]){
+    stateMap[state]={
+      state,
+      requirements:0,
+      placements:0
+    }
+  }
 
-stateMap[state].requirements++
+  stateMap[state].requirements++
 
 })
 
-/* Placements */
-placementStates?.forEach(p => {
+// Count Placements
+placementsData?.forEach(p => {
 
-const state =
-hospitalStateMap[p.hospital_id] || "Unknown"
+  const state = hospitalStateMap[p.hospital_id] || "Unknown"
 
-if(!stateMap[state]){
-stateMap[state]={
-state,
-requirements:0,
-placements:0
-}
-}
+  if(!stateMap[state]){
+    stateMap[state]={
+      state,
+      requirements:0,
+      placements:0
+    }
+  }
 
-stateMap[state].placements++
+  stateMap[state].placements++
 
 })
+console.log("Hospital State Map", hospitalStateMap)
+console.log("Requirements", requirementsData)
+console.log("Placements", placementsData)
+console.log("Final State Map", stateMap)
 setStateSummary(
 Object.values(stateMap)
 .sort((a,b)=>b.requirements-a.requirements)
@@ -372,6 +381,7 @@ marginBottom:"40px"
 
 </div>
 
+
 <h3 style={{marginBottom:"20px"}}>
 Requirements by State
 </h3>
@@ -398,29 +408,29 @@ width:"220px"
 }}
 >
 
-<h4 style={{
-marginTop:0,
-marginBottom:"15px"
-}}>
+<h4 style={{marginTop:0}}>
 {s.state}
 </h4>
 
-<p style={{margin:"8px 0"}}>
+<div style={{marginTop:"15px"}}>
+
+<div style={{marginBottom:"10px"}}>
 <b>Open Requirements</b><br/>
 {s.requirements}
-</p>
+</div>
 
-<p style={{margin:"8px 0"}}>
+<div>
 <b>Placements</b><br/>
 {s.placements}
-</p>
+</div>
+
+</div>
 
 </div>
 
 ))}
 
 </div>
-
 {mounted && (
 
 <>
