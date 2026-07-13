@@ -17,7 +17,7 @@ setIsAdmin(true)
 }
 },[])
 const { id } = useParams()
-
+const router = useRouter()
 const [doctor,setDoctor] = useState(null)
 const [specialties,setSpecialties] = useState([])
 const [saving,setSaving] = useState(false)
@@ -93,6 +93,44 @@ return
 }
 
 setTimeline(data || [])
+
+}
+function formatDate(date){
+
+if(!date) return "-"
+
+const d = new Date(date)
+
+return d.toLocaleDateString("en-GB")
+
+}
+
+function timelineColor(status){
+
+switch(status){
+
+case "shortlisted":
+return "#f59e0b"
+
+case "interview_assigned":
+return "#3b82f6"
+
+case "interview_completed":
+return "#fb923c"
+
+case "offer_released":
+return "#8b5cf6"
+
+case "placement_done":
+return "#16a34a"
+
+case "rejected":
+return "#ef4444"
+
+default:
+return "#64748b"
+
+}
 
 }
 function updateField(field,value){
