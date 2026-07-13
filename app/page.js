@@ -274,6 +274,7 @@ setStateSummary(
 Object.values(stateMap)
 .sort((a,b)=>b.requirements-a.requirements)
 )
+  }
 /* UI */
 
 function card(title,value,color){
