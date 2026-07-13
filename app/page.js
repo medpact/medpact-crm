@@ -85,7 +85,7 @@ headers:{
 "Content-Type":"application/json"
 }
 })
-  console.log("Button clicked")
+  
 
 if(!res.ok){
 alert("API not reachable")
@@ -228,8 +228,6 @@ states!fk_hospital_state (
 )
 `)
 
-console.log(hospitalsData)
-console.log(error)
 
 // Build hospital -> state map
 const hospitalStateMap = {}
@@ -285,10 +283,7 @@ placementsData?.forEach(p => {
   stateMap[state].placements++
 
 })
-console.log("Hospital State Map", hospitalStateMap)
-console.log("Requirements", requirementsData)
-console.log("Placements", placementsData)
-console.log("Final State Map", stateMap)
+
 setStateSummary(
 Object.values(stateMap)
 .sort((a,b)=>b.requirements-a.requirements)
