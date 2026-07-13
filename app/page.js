@@ -46,7 +46,7 @@ const [hospitalChart,setHospitalChart] = useState({
 labels:[],
 datasets:[]
 })
-
+const [requirementsByState,setRequirementsByState] = useState({})
 useEffect(() => {
 
   const host = window.location.hostname
@@ -216,6 +216,31 @@ backgroundColor:"#8b5cf6"
 }]
 })
 
+/* REQUIREMENTS BY STATE */
+
+const { data:reqStates } = await supabase
+.from("requirements")
+.select(`
+hospital_id,
+hospitals(
+states(name)
+)
+`)
+
+let stateMap = {}
+
+reqStates?.forEach(r=>{
+
+const state =
+r.hospitals?.states?.name || "Unknown"
+
+stateMap[state] =
+(stateMap[state] || 0) + 1
+
+})
+
+setRequirementsByState(stateMap)
+
 }
 
 
@@ -311,7 +336,41 @@ marginBottom:"40px"
 
 {card("Doctors",stats.doctors,"#2563eb")}
 {card("Hospitals",stats.hospitals,"#16a34a")}
-{card("Requirements",stats.requirements,"#f59e0b")}
+<div style={{
+background:"#fff",
+border:"1px solid #e5e7eb",
+borderRadius:"10px",
+padding:"20px",
+width:"220px"
+}}>
+
+<h4 style={{margin:0,color:"#64748b"}}>
+Requirements
+</h4>
+
+<h2 style={{marginTop:"10px",color:"#f59e0b"}}>
+{stats.requirements}
+</h2>
+
+<div style={{
+marginTop:"10px",
+fontSize:"13px",
+lineHeight:"22px"
+}}>
+
+{Object.entries(requirementsByState).map(([state,count])=>(
+
+<div key={state}>
+
+<b>{state}</b> : {count}
+
+</div>
+
+))}
+
+</div>
+
+</div>
 {card("Shortlisted",stats.shortlists,"#8b5cf6")}
 {card("Placements",stats.placements,"#22c55e")}
 
