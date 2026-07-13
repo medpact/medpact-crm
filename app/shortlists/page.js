@@ -56,6 +56,7 @@ specialties(name)
 `)
   .neq("status","rejected")
 .neq("status","placement_done")
+.neq("status","closed")
   .order("created_at",{ascending:false})
 
 
@@ -180,7 +181,16 @@ remarks:updatedRemarks
 fetchShortlists()
 
 }
+function getAge(createdDate){
 
+const today = new Date()
+const created = new Date(createdDate)
+
+return Math.floor(
+(today - created) / (1000 * 60 * 60 * 24)
+)
+
+}
 /* STATUS COLOR */
 
 function statusColor(status){
@@ -191,12 +201,40 @@ if(status==="interview_completed") return "#fb923c"
 if(status==="offer_released") return "#8b5cf6"
 if(status==="placement_done") return "#16a34a"
 if(status==="rejected") return "#ef4444"
-
+if(status==="closed") return "#6b7280"
 return "#64748b"
 
 }
 
+async function closePipeline(row){
 
+const reason = prompt(
+"Reason for closing this pipeline?"
+)
+
+if(!reason || !reason.trim()){
+alert("Close reason is mandatory")
+return
+}
+
+const { error } = await supabase
+.from("shortlists")
+.update({
+status:"closed",
+remarks:reason
+})
+.eq("id",row.id)
+
+if(error){
+alert("Unable to close pipeline")
+return
+}
+
+alert("Pipeline closed successfully")
+
+fetchShortlists()
+
+}
 /* ACTION BUTTONS */
 
 function actionButton(row){
@@ -211,6 +249,22 @@ Assign Interview
 <button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
+{getAge(row.created_at) > 45 && (
+<button
+style={{
+marginLeft:"6px",
+background:"#6b7280",
+color:"#fff",
+border:"none",
+padding:"6px 10px",
+borderRadius:"4px",
+cursor:"pointer"
+}}
+onClick={()=>closePipeline(row)}
+>
+Close
+</button>
+)}
 </>
 )
 }
@@ -227,6 +281,24 @@ Interview Done
 <button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
+{getAge(row.created_at) > 45 && (
+
+<button
+style={{
+marginLeft:"6px",
+background:"#6b7280",
+color:"#fff",
+border:"none",
+padding:"6px 10px",
+borderRadius:"4px",
+cursor:"pointer"
+}}
+onClick={()=>closePipeline(row)}
+>
+Close
+</button>
+
+)}
 </>
 )
 }
@@ -241,6 +313,24 @@ Release Offer
 <button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
+{getAge(row.created_at) > 45 && (
+
+<button
+style={{
+marginLeft:"6px",
+background:"#6b7280",
+color:"#fff",
+border:"none",
+padding:"6px 10px",
+borderRadius:"4px",
+cursor:"pointer"
+}}
+onClick={()=>closePipeline(row)}
+>
+Close
+</button>
+
+)}
 </>
 )
 }
@@ -255,6 +345,24 @@ Placement Done
 <button style={{marginLeft:"6px"}} onClick={()=>rejectCandidate(row)}>
 Reject
 </button>
+  {getAge(row.created_at) > 45 && (
+
+<button
+style={{
+marginLeft:"6px",
+background:"#6b7280",
+color:"#fff",
+border:"none",
+padding:"6px 10px",
+borderRadius:"4px",
+cursor:"pointer"
+}}
+onClick={()=>closePipeline(row)}
+>
+Close
+</button>
+
+)}
 </>
 )
 }
@@ -270,7 +378,6 @@ return (
 (s.doctors?.name || "")
 .toLowerCase()
 .includes(term)
-
 ||
 
 (s.doctors?.specialties?.name || "")
@@ -358,7 +465,25 @@ overflow:"hidden"
 
 <tr key={s.id} style={{borderTop:"1px solid #e5e7eb"}}>
 
-<td>{formatDate(s.created_at)}</td>
+<td
+title={`${getAge(s.created_at)} Days Old`}
+style={{
+color:
+getAge(s.created_at) > 45
+? "#dc2626"
+: getAge(s.created_at) > 30
+? "#f59e0b"
+: "#16a34a",
+
+fontWeight:
+getAge(s.created_at) > 45
+? "700"
+: "500"
+}}
+>
+{getAge(s.created_at) > 45 ? "⚠ " : ""}
+{formatDate(s.created_at)}
+</td>
 
 <td>
 <Link href={`/doctors/${s.doctors?.id}`}>
