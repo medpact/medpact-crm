@@ -101,18 +101,38 @@ grouped[hospital].push(r)
 
 
 /* FILTER */
+const filteredHospitals = Object.keys(grouped).filter(hospital => {
 
-const filteredHospitals = Object.keys(grouped).filter(hospital=>{
-const reqs = grouped[hospital]
+  const reqs = grouped[hospital]
 
-const hospitalMatch = hospital.toLowerCase().includes(search.toLowerCase())
+  const searchText = search.trim().toLowerCase()
 
-const anyReqMatch = reqs.some(r=>
-(r.specialties?.name || "").toLowerCase().includes(search.toLowerCase()) ||
-(r.city || "").toLowerCase().includes(search.toLowerCase())
-)
+  if(!searchText) return true
 
-return hospitalMatch || anyReqMatch
+  const hospitalMatch =
+    hospital.toLowerCase().includes(searchText)
+
+  const anyReqMatch = reqs.some(r => {
+
+    const requirementCity =
+      (r.city || "").toLowerCase()
+
+    const hospitalCity =
+      (r.hospitals?.cities?.name || "").toLowerCase()
+
+    const specialty =
+      (r.specialties?.name || "").toLowerCase()
+
+    return (
+      requirementCity.includes(searchText) ||
+      hospitalCity.includes(searchText) ||
+      specialty.includes(searchText)
+    )
+
+  })
+
+  return hospitalMatch || anyReqMatch
+
 })
 
 
@@ -267,7 +287,9 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 
 <td>{formatDate(latestDate)}</td>
 <td>{hospital}</td>
-<td>{reqs[0].hospitals?.cities?.name}</td>
+<td>
+  {reqs[0].city || reqs[0].hospitals?.cities?.name || "-"}
+</td>
 <td>{reqs.length}</td>
 <td>{expanded===hospital ? "▲" : "▼"}</td>
 
@@ -307,7 +329,9 @@ style={{cursor:"pointer", color:"red"}}
 
 <tr key={r.id}>
 <td style={{paddingLeft:"40px"}}>{r.specialties?.name}</td>
-<td>{r.hospitals?.cities?.name}</td>
+<td>
+  {r.city || r.hospitals?.cities?.name || "-"}
+</td>
 <td>{r.positions}</td>
 
 <td>
