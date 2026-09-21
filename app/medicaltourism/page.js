@@ -1,1943 +1,3196 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { Newsreader, Public_Sans } from "next/font/google"
-import { supabase } from "../../lib/supabase"
 
-const display = Newsreader({ subsets: ["latin"], weight: ["300", "400", "500"], style: ["normal", "italic"] })
-const body = Public_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"] })
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  variable: "--font-display",
+})
 
-/* ------------------------------------------------------------------ */
-/*  EDIT THESE                                                         */
-/* ------------------------------------------------------------------ */
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+})
 
-const WHATSAPP = "919999999999"          // country code + number, digits only
+const WHATSAPP_NUMBER = "919000000000"
 const EMAIL = "care@medpact.in"
-const PHONE_DISPLAY = "+91 99999 99999"
+const PHONE = "+91 90000 00000"
 
-// Rough conversion for the estimate widget. Update when you like.
-const CURRENCIES = {
-  USD: { symbol: "$", rate: 1, label: "US dollars" },
-  EUR: { symbol: "€", rate: 0.92, label: "Euros" },
-  GBP: { symbol: "£", rate: 0.79, label: "Pounds" },
-}
-
-// What a trip realistically costs on top of the treatment quote.
-const TRAVEL_ALLOWANCE_USD = 2800
-
-/* ------------------------------------------------------------------ */
-/*  FALLBACK CONTENT                                                   */
-/* ------------------------------------------------------------------ */
-
-/**
- * Benchmark price list.
- *
- *  price_us / price_india  — USD figures used by the estimate widget and the savings bars.
- *  us_label / india_label  — what is printed in the comparison table. Use these when the real
- *                            figure is a range or carries a qualifier, so the table stays honest.
- *  note                    — secondary line under the India figure (current hospital ranges).
- *  saving_label            — printed as given rather than recomputed.
- *
- *  Rupee figures converted at roughly Rs 83 to the dollar. Update alongside CURRENCIES.
- */
-const SAMPLE_PROCEDURES = [
+const procedures = [
   {
-    id: "s1", glyph: "🦷", name: "Dental implants", category: "Dental", stay_days: 12,
-    price_us: 2800, price_india: 1000,
-    us_label: "$2,800", india_label: "~$1,000", saving_label: "64%",
+    id: 1,
+    name: "Dental Implants",
+    icon: "🦷",
+    department: "Dental",
+    india: 1000,
+    us: 2800,
+    indiaDisplay: "$1,000",
+    usDisplay: "$2,800",
+    stay: "7–10 days",
+    description:
+      "Implant-supported tooth replacement with specialist dental planning and restorative care.",
   },
   {
-    id: "s2", glyph: "🦵", name: "Knee replacement", category: "Orthopaedic", stay_days: 16,
-    price_us: 50000, price_india: 6200,
-    us_label: "$50,000", india_label: "$6,200", note: "Rs 2–3.5L current Apollo range",
-    saving_label: "~88%+",
+    id: 2,
+    name: "Knee Replacement",
+    icon: "🦵",
+    department: "Orthopaedic",
+    india: 6200,
+    us: 50000,
+    indiaDisplay: "$6,200",
+    usDisplay: "$50,000",
+    stay: "2–3 weeks",
+    description:
+      "Advanced joint replacement for patients seeking specialist orthopaedic treatment.",
   },
   {
-    id: "s3", glyph: "🦴", name: "Hip replacement", category: "Orthopaedic", stay_days: 16,
-    price_us: 50000, price_india: 7000,
-    us_label: "$50,000", india_label: "$7,000", note: "Rs 1.5–4L current Apollo range",
-    saving_label: "~86%+",
+    id: 3,
+    name: "Hip Replacement",
+    icon: "🦴",
+    department: "Orthopaedic",
+    india: 7000,
+    us: 50000,
+    indiaDisplay: "$7,000",
+    usDisplay: "$50,000",
+    stay: "2–3 weeks",
+    description:
+      "Hip replacement with coordinated surgical, rehabilitation and recovery planning.",
   },
   {
-    id: "s4", glyph: "🫀", name: "Heart bypass (CABG)", category: "Cardiac", stay_days: 21,
-    price_us: 144000, price_india: 5200,
-    us_label: "$144,000", india_label: "$5,200", saving_label: "~96%",
+    id: 4,
+    name: "CABG / Heart Bypass",
+    icon: "🫀",
+    department: "Cardiac",
+    india: 5200,
+    us: 144000,
+    indiaDisplay: "$5,200",
+    usDisplay: "$144,000",
+    stay: "3–4 weeks",
+    description:
+      "Coronary artery bypass surgery coordinated with experienced cardiac specialists.",
   },
   {
-    id: "s5", glyph: "❤️", name: "Heart valve replacement", category: "Cardiac", stay_days: 21,
-    price_us: 170000, price_india: 5500,
-    us_label: "$170,000", india_label: "$5,500", saving_label: "~97%",
+    id: 5,
+    name: "Heart Valve Replacement",
+    icon: "❤️",
+    department: "Cardiac",
+    india: 5500,
+    us: 170000,
+    indiaDisplay: "$5,500",
+    usDisplay: "$170,000",
+    stay: "3–4 weeks",
+    description:
+      "Surgical valve replacement with specialist cardiac evaluation and coordinated recovery.",
   },
   {
-    id: "s6", glyph: "🦴", name: "Spinal fusion", category: "Neuro", stay_days: 18,
-    price_us: 100000, price_india: 2400,
-    us_label: "~$100,000", us_note: "payer expenditure",
-    india_label: "Rs 1–3L", saving_label: "~97–99%",
+    id: 6,
+    name: "Spinal Fusion",
+    icon: "🦴",
+    department: "Neuro & Spine",
+    india: 2500,
+    us: 100000,
+    indiaDisplay: "₹1–3 lakh",
+    usDisplay: "~$100,000",
+    stay: "2–3 weeks",
+    description:
+      "Complex spine surgery coordinated around diagnosis, imaging, surgery and rehabilitation.",
   },
   {
-    id: "s7", glyph: "⚖️", name: "Sleeve gastrectomy", category: "Bariatric", stay_days: 14,
-    price_us: 41400, price_india: 3600,
-    us_label: "~$41,400", us_note: "two-year cost benchmark",
-    india_label: "Rs 2–4L", saving_label: "~90%+",
+    id: 7,
+    name: "Sleeve Gastrectomy",
+    icon: "⚖️",
+    department: "Bariatric",
+    india: 3500,
+    us: 41400,
+    indiaDisplay: "₹2–4 lakh",
+    usDisplay: "~$41,400",
+    stay: "2 weeks",
+    description:
+      "Bariatric surgery with pre-operative evaluation and structured recovery support.",
   },
   {
-    id: "s8", glyph: "👁️", name: "Cataract surgery", category: "Eye", stay_days: 7,
-    price_us: 4000, price_india: 780,
-    us_label: "$3,000–5,000", us_note: "per eye, uninsured",
-    india_label: "Rs 30k–1L", saving_label: "~65–90%",
+    id: 8,
+    name: "Cataract Surgery",
+    icon: "👁️",
+    department: "Ophthalmology",
+    india: 1000,
+    us: 5000,
+    indiaDisplay: "₹30k–1 lakh",
+    usDisplay: "$3,000–5,000 / eye",
+    stay: "5–7 days",
+    description:
+      "Modern cataract treatment with specialist evaluation and post-operative care.",
   },
   {
-    id: "s9", glyph: "🧠", name: "Brain tumour surgery", category: "Neuro", stay_days: 24,
-    price_us: 90000, price_india: 2100,
-    us_label: "$50,000–140,000", us_note: "depending on the case",
-    india_label: "Rs 1–2.5L", saving_label: "Very high",
+    id: 9,
+    name: "Brain Tumor / Craniotomy",
+    icon: "🧠",
+    department: "Neurosurgery",
+    india: 3000,
+    us: 140000,
+    indiaDisplay: "₹1–2.5 lakh",
+    usDisplay: "~$50k–140k+",
+    stay: "3–4 weeks",
+    description:
+      "Complex neurosurgical care requiring detailed medical-record and imaging review.",
   },
   {
-    id: "s10", glyph: "🫀", name: "Angioplasty", category: "Cardiac", stay_days: 10,
-    price_us: 57000, price_india: 3300,
-    us_label: "$57,000", india_label: "$3,300", saving_label: "~94%",
+    id: 10,
+    name: "Angioplasty",
+    icon: "🫀",
+    department: "Cardiac",
+    india: 3300,
+    us: 57000,
+    indiaDisplay: "$3,300",
+    usDisplay: "$57,000",
+    stay: "7–10 days",
+    description:
+      "Catheter-based coronary intervention with coordinated cardiac evaluation and follow-up.",
   },
 ]
 
-const SAMPLE_DOCTORS = [
-  { id: "d1", name: "Dr. Anand Krishnan", experience_years: 27, specialty: "Cardiothoracic surgery", hospital: "Chennai" },
-  { id: "d2", name: "Dr. Meera Iyer", experience_years: 19, specialty: "Neurosurgery", hospital: "Bengaluru" },
-  { id: "d3", name: "Dr. Rajiv Sethi", experience_years: 22, specialty: "Implantology", hospital: "Hyderabad" },
-  { id: "d4", name: "Dr. Fatima Sheikh", experience_years: 16, specialty: "Joint replacement", hospital: "Chennai" },
-]
-
-const SAMPLE_STORIES = [
+const departments = [
   {
-    id: "t1",
-    name: "Karen D.",
-    country: "Phoenix, Arizona",
-    procedure: "Heart valve replacement",
-    quote:
-      "My surgeon in Phoenix quoted me a number I could not say out loud. Three weeks later I was walking the hospital garden in Chennai with a new valve and a bill I paid without borrowing.",
-    video_url: "",
+    id: "dental",
+    name: "Dental",
+    eyebrow: "Precision. Comfort. Confidence.",
+    description:
+      "From implants and restorative dentistry to complex oral rehabilitation, connect with experienced dental specialists in leading Indian hospitals.",
+    icon: "🦷",
+    procedures: ["Dental Implants", "Full-mouth Rehabilitation", "Smile & Restorative Dentistry"],
+    colorClass: "dental",
   },
   {
-    id: "t2",
-    name: "Thomas R.",
-    country: "Manchester, UK",
-    procedure: "Full-mouth implants",
-    quote:
-      "I had waited fourteen months on a list at home. MedPact had my scans reviewed in four days and a date within three weeks.",
-    video_url: "",
+    id: "cardiac",
+    name: "Cardiac",
+    eyebrow: "Advanced heart care",
+    description:
+      "Access coordinated cardiac evaluation and specialist care for coronary disease, valve conditions and other complex cardiac procedures.",
+    icon: "🫀",
+    procedures: ["CABG / Heart Bypass", "Heart Valve Replacement", "Angioplasty"],
+    colorClass: "cardiac",
   },
   {
-    id: "t3",
-    name: "Élise M.",
-    country: "Lyon, France",
-    procedure: "Spinal fusion",
-    quote:
-      "Someone met me at the airport at two in the morning. That sounds small. When you are travelling alone for surgery, it is not small.",
-    video_url: "",
+    id: "neuro",
+    name: "Neuro & Spine",
+    eyebrow: "Complex neurological care",
+    description:
+      "Specialist pathways for neurological and spine conditions, with medical-record review before you travel.",
+    icon: "🧠",
+    procedures: ["Spinal Fusion", "Brain Tumor Surgery", "Complex Spine Care"],
+    colorClass: "neuro",
   },
 ]
 
-const JOURNEY = [
-  { t: "Send us your reports", d: "Scans, prescriptions, a recent quote from home — photos from your phone are fine." },
-  { t: "Get a written opinion", d: "Two consultants review your case and reply within 48 hours. No charge, no obligation." },
-  { t: "See the full price", d: "One figure covering surgery, surgeon, hospital stay, implants and medication. Not a starting price." },
-  { t: "Visa and flights", d: "We issue the medical visa invitation letter and help you pick dates around the surgeon's calendar." },
-  { t: "You land, we meet you", d: "Airport pickup, an apartment or hotel near the hospital, and a coordinator on call in English." },
-  { t: "Treatment and recovery", d: "Surgery, ward, physiotherapy, and a fitness-to-fly clearance before you travel back." },
-  { t: "Follow-up from home", d: "Video reviews with your surgeon at 1, 3 and 6 months, and records formatted for your GP." },
-]
-
-const FAQS = [
+const doctors = [
   {
-    q: "Why is treatment in India so much cheaper?",
-    a: "Salaries, land, and hospital overheads are a fraction of US costs, and there is no insurance billing layer adding administration to every line item. The implants, the machines and the drugs are largely the same brands you would get at home.",
+    name: "Dr. Anand Krishnan",
+    specialty: "Cardiothoracic Surgery",
+    experience: "27+ years",
+    location: "Chennai",
+    initials: "AK",
   },
   {
-    q: "Who actually operates on me?",
-    a: "Consultants with 15 to 30 years of experience, most with fellowships in the UK, US or Singapore. You get the surgeon's name, registration number and case volume in writing before you book anything.",
+    name: "Dr. Meera Iyer",
+    specialty: "Neurosurgery",
+    experience: "19+ years",
+    location: "Bengaluru",
+    initials: "MI",
   },
   {
-    q: "Are the hospitals accredited?",
-    a: "We only work with NABH-accredited hospitals, and most of our partners also hold JCI accreditation — the same international standard applied to hospitals in the US and Europe.",
+    name: "Dr. Rajiv Sethi",
+    specialty: "Implantology",
+    experience: "22+ years",
+    location: "Hyderabad",
+    initials: "RS",
   },
   {
-    q: "What if something goes wrong?",
-    a: "Complications are handled by the operating hospital at no additional surgical fee under the package terms, which are written into your estimate before you travel. We tell you the specific risk figures for your procedure up front.",
-  },
-  {
-    q: "How long will I be away?",
-    a: "Dental work is usually 10 to 14 days. Cardiac and spinal surgery run three to four weeks including recovery and clearance to fly.",
-  },
-  {
-    q: "Will my insurer reimburse me?",
-    a: "Some US and European insurers reimburse part of the cost, and most patients pay out of pocket because it is still far less than their deductible. We provide itemised, coded invoices for any claim you want to file.",
+    name: "Dr. Fatima Sheikh",
+    specialty: "Joint Replacement",
+    experience: "16+ years",
+    location: "Chennai",
+    initials: "FS",
   },
 ]
 
-/* ------------------------------------------------------------------ */
-/*  HELPERS                                                            */
-/* ------------------------------------------------------------------ */
+const testimonials = [
+  {
+    name: "Michael R.",
+    country: "United States",
+    text:
+      "The biggest difference for us was having someone coordinate the medical discussions before we travelled. Everything felt much more structured.",
+    procedure: "Cardiac treatment",
+  },
+  {
+    name: "Sarah M.",
+    country: "United States",
+    text:
+      "We were able to review the medical records, understand the treatment pathway and discuss the expected costs before making the trip.",
+    procedure: "Orthopaedic treatment",
+  },
+  {
+    name: "David K.",
+    country: "United Kingdom",
+    text:
+      "The coordination between the hospital, doctor and travel arrangements made the experience much easier for our family.",
+    procedure: "Neurosurgical care",
+  },
+]
 
-function money(usd, code) {
-  const c = CURRENCIES[code]
-  const value = Math.round((usd * c.rate) / 10) * 10
-  return c.symbol + value.toLocaleString("en-US")
+const faqs = [
+  {
+    q: "How do I get a treatment estimate?",
+    a:
+      "Send us your medical reports, scans and relevant treatment history. Our team can coordinate a medical review and help you understand the expected treatment pathway and indicative costs.",
+  },
+  {
+    q: "Do I need to travel to India before speaking to a doctor?",
+    a:
+      "No. The initial medical review can usually begin remotely. Your reports can be shared digitally for preliminary assessment before you decide to travel.",
+  },
+  {
+    q: "Can Medpact arrange hospital appointments?",
+    a:
+      "Yes. Medpact can coordinate communication with hospitals and specialists, subject to doctor and hospital availability.",
+  },
+  {
+    q: "What is included in the treatment cost?",
+    a:
+      "Inclusions vary by hospital and procedure. A final estimate should clearly identify hospital charges, surgeon fees, implants or devices where applicable, investigations, accommodation and other relevant costs.",
+  },
+  {
+    q: "Can my family travel with me?",
+    a:
+      "Yes. Family members can travel with the patient. Travel and accommodation arrangements can be discussed as part of the coordination process.",
+  },
+  {
+    q: "Are the prices on this website guaranteed?",
+    a:
+      "No. The prices shown are illustrative benchmarks for comparison. Actual treatment costs depend on the hospital, doctor, diagnosis, procedure complexity, implants, investigations, length of stay and other factors.",
+  },
+]
+
+function openWhatsApp(message = "Hello Medpact, I would like to explore medical treatment in India.") {
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+  window.open(url, "_blank", "noopener,noreferrer")
 }
 
-function embedUrl(url) {
-  if (!url) return ""
-  const m = url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{6,})/)
-  return m ? "https://www.youtube.com/embed/" + m[1] : url
+function scrollToId(id) {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  })
 }
-
-function initials(name = "") {
-  return name
-    .replace(/^Dr\.?\s*/i, "")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-}
-
-function useInView(threshold = 0.25) {
-  const ref = useRef(null)
-  const [seen, setSeen] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el || seen) return
-    const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && setSeen(true)),
-      { threshold }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [seen, threshold])
-  return [ref, seen]
-}
-
-/* ------------------------------------------------------------------ */
-/*  PAGE                                                               */
-/* ------------------------------------------------------------------ */
 
 export default function MedicalTourismPage() {
-  const [procedures, setProcedures] = useState(SAMPLE_PROCEDURES)
-  const [doctors, setDoctors] = useState(SAMPLE_DOCTORS)
-  const [stories, setStories] = useState(SAMPLE_STORIES)
-
   const [currency, setCurrency] = useState("USD")
-  const [selectedId, setSelectedId] = useState(SAMPLE_PROCEDURES[0].id)
-  const [openFaq, setOpenFaq] = useState(0)
-
-  useEffect(() => {
-    let live = true
-
-    async function load() {
-      const [proc, docs, testi] = await Promise.all([
-        supabase.from("procedures").select("*"),
-        supabase.from("doctors").select("id,name,experience_years,photo_url,hospital,specialties(name)").limit(8),
-        supabase.from("testimonials").select("*").limit(6),
-      ])
-
-      if (!live) return
-
-      if (proc.data?.length) {
-        const clean = proc.data.filter((p) => p.price_india > 0 && p.price_us > 0)
-        if (clean.length) {
-          setProcedures(clean)
-          setSelectedId(clean[0].id)
-        }
-      }
-
-      if (docs.data?.length) {
-        setDoctors(
-          docs.data.map((d) => ({
-            ...d,
-            specialty: d.specialties?.name || d.specialties?.[0]?.name || "Consultant",
-          }))
-        )
-      }
-
-      if (testi.data?.length) setStories(testi.data)
-    }
-
-    load().catch(() => {
-      /* keep the sample content on screen rather than an empty page */
-    })
-
-    return () => {
-      live = false
-    }
-  }, [])
-
-  const selected = useMemo(
-    () => procedures.find((p) => String(p.id) === String(selectedId)) || procedures[0],
-    [procedures, selectedId]
-  )
-
-  const savings = selected ? selected.price_us - selected.price_india : 0
-  const net = savings - TRAVEL_ALLOWANCE_USD
-  const cut = selected ? Math.round((1 - selected.price_india / selected.price_us) * 100) : 0
-
-  return (
-    <div className={body.className + " page"}>
-      <SiteHeader />
-
-      <main>
-        <Hero
-          procedures={procedures}
-          selected={selected}
-          selectedId={selectedId}
-          setSelectedId={setSelectedId}
-          currency={currency}
-          setCurrency={setCurrency}
-          savings={savings}
-          net={net}
-          cut={cut}
-        />
-
-        <Assurances />
-        <Specialities procedures={procedures} currency={currency} />
-        <Comparison procedures={procedures} currency={currency} />
-        <Journey />
-        <Doctors doctors={doctors} />
-        <Stories stories={stories} />
-        <Faq open={openFaq} setOpen={setOpenFaq} />
-        <Enquiry procedures={procedures} />
-      </main>
-
-      <SiteFooter />
-
-      <a
-        className="whatsapp-float"
-        href={"https://wa.me/" + WHATSAPP}
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Message us on WhatsApp"
-      >
-        <WhatsAppMark />
-        <span>WhatsApp</span>
-      </a>
-
-      <GlobalStyles />
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  SECTIONS                                                           */
-/* ------------------------------------------------------------------ */
-
-function SiteHeader() {
-  const [solid, setSolid] = useState(false)
-  useEffect(() => {
-    const onScroll = () => setSolid(window.scrollY > 24)
-    window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
-  }, [])
-
-  return (
-    <header className={"site-header" + (solid ? " is-solid" : "")}>
-      <div className="shell header-inner">
-        <a className="wordmark" href="/">
-          MedPact<span className="wordmark-dot">.</span>
-        </a>
-
-        <nav className="header-nav">
-          <a href="#specialities">Treatments</a>
-          <a href="#prices">Prices</a>
-          <a href="#journey">How it works</a>
-          <a href="#doctors">Doctors</a>
-          <a href="#answers">Answers</a>
-        </nav>
-
-        <a className="btn btn-dark btn-sm" href="#enquire">
-          Get a written estimate
-        </a>
-      </div>
-    </header>
-  )
-}
-
-function Hero({ procedures, selected, selectedId, setSelectedId, currency, setCurrency, savings, net, cut }) {
-  return (
-    <section className="hero">
-      <div className="shell hero-grid">
-        <div className="hero-copy">
-          <p className="hero-kicker">Treatment in India for patients from the US, UK and Europe</p>
-
-          <h1 className={display.className + " hero-title"}>
-            The same operation.
-            <br />
-            A different number
-            <br />
-            at the bottom.
-          </h1>
-
-          <p className="hero-lede">
-            MedPact arranges surgery at NABH and JCI accredited hospitals in India — the consultant,
-            the theatre, the ward, the visa letter and the person who meets you at arrivals. You see
-            the whole price before you book a flight.
-          </p>
-
-          <div className="hero-actions">
-            <a className="btn btn-dark" href="#enquire">
-              Send my reports
-            </a>
-            <a className="btn btn-plain" href="#prices">
-              See what things cost
-            </a>
-          </div>
-
-          <p className="hero-note">
-            Free second opinion within 48 hours. No card, no deposit, no obligation to travel.
-          </p>
-        </div>
-
-        {/* The estimate card — the thing this whole page is really about */}
-        <div className="estimate" aria-live="polite">
-          <div className="estimate-head">
-            <span className="estimate-title">Indicative estimate</span>
-            <div className="currency-switch" role="group" aria-label="Currency">
-              {Object.keys(CURRENCIES).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  className={code === currency ? "is-on" : ""}
-                  onClick={() => setCurrency(code)}
-                  aria-pressed={code === currency}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="field">
-            <span className="field-label">What do you need done?</span>
-            <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
-              {procedures.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <dl className="ledger">
-            <div className="ledger-row">
-              <dt>Typical price at home</dt>
-              <dd className="strike">{money(selected.price_us, currency)}</dd>
-            </div>
-            <div className="ledger-row">
-              <dt>MedPact package in India</dt>
-              <dd>{money(selected.price_india, currency)}</dd>
-            </div>
-            <div className="ledger-row muted">
-              <dt>Flights, stay, coordinator</dt>
-              <dd>+ {money(TRAVEL_ALLOWANCE_USD, currency)}</dd>
-            </div>
-            <div className="ledger-row total">
-              <dt>You keep</dt>
-              <dd>{money(net, currency)}</dd>
-            </div>
-          </dl>
-
-          <div className="estimate-foot">
-            <span className="cut-badge">{cut}% less</span>
-            <span>
-              {selected.stay_days ? selected.stay_days + " days in India, door to door" : "Typically 2–4 weeks in India"}
-            </span>
-          </div>
-
-          <a className="btn btn-jade btn-block" href="#enquire">
-            Price my case exactly
-          </a>
-          <p className="estimate-small">
-            Package covers surgeon, anaesthesia, theatre, implants, ward and medication. Your final
-            figure is confirmed in writing after the consultant reads your reports.
-          </p>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Assurances() {
-  const items = [
-    ["Accredited hospitals only", "NABH accredited, most also JCI — the standard applied to hospitals in the US and Europe."],
-    ["No waiting list", "Most dates are offered within three weeks of your reports being reviewed."],
-    ["Everything in English", "Consultants, coordinators, discharge notes and invoices."],
-    ["Visa letter in 48 hours", "Medical visa invitation issued by the treating hospital, for you and one attendant."],
-  ]
-  return (
-    <section className="assurances">
-      <div className="shell assurance-grid">
-        {items.map(([t, d]) => (
-          <div className="assurance" key={t}>
-            <h3>{t}</h3>
-            <p>{d}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function Specialities({ procedures, currency }) {
-  const groups = useMemo(() => {
-    const byCat = {}
-    procedures.forEach((p) => {
-      const cat = p.category || p.department || "Other"
-      byCat[cat] = byCat[cat] || []
-      byCat[cat].push(p)
-    })
-    return Object.entries(byCat).slice(0, 6)
-  }, [procedures])
-
-  const blurbs = {
-    Cardiac: "Bypass, valve repair and replacement, angioplasty and paediatric cardiac surgery.",
-    Dental: "Implants, full-mouth rehabilitation, veneers and complex restorative work.",
-    Neuro: "Spinal fusion, disc replacement, tumour resection and deep brain stimulation.",
-    Orthopaedic: "Hip and knee replacement, revision surgery, arthroscopy and sports injuries.",
-    Bariatric: "Sleeve gastrectomy and gastric bypass, with dietetic follow-up once you are home.",
-    Eye: "Cataract surgery, lens replacement, LASIK and retinal procedures.",
-  }
-
-  return (
-    <section id="specialities" className="band">
-      <div className="shell">
-        <SectionHead
-          title="What we arrange"
-          note="Four departments we know deeply, rather than a catalogue of everything."
-        />
-
-        <div className="spec-list">
-          {groups.map(([cat, list]) => {
-            const from = Math.min(...list.map((p) => p.price_india))
-            return (
-              <article className="spec" key={cat}>
-                <div className="spec-main">
-                  <h3 className={display.className}>{cat}</h3>
-                  <p>{blurbs[cat] || "Consultant-led treatment with a written package price."}</p>
-                  <ul className="spec-procs">
-                    {list.slice(0, 4).map((p) => (
-                      <li key={p.id}>{p.name}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="spec-side">
-                  <span className="spec-from">from</span>
-                  <span className={display.className + " spec-price"}>{money(from, currency)}</span>
-                  <a className="link-underline" href="#enquire">
-                    Ask about {cat.toLowerCase()}
-                  </a>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Comparison({ procedures, currency }) {
-  const [ref, seen] = useInView(0.15)
-  const showNative = currency === "USD"
-
-  return (
-    <section id="prices" className="band band-ink" ref={ref}>
-      <div className="shell">
-        <SectionHead
-          invert
-          title="What the same treatment costs"
-          note="Published US benchmarks against Indian hospital benchmarks. Treatment only — flights, accommodation and the coordinator are quoted separately so nothing is buried."
-        />
-
-        <div className="table-wrap">
-          <table className="price-table">
-            <thead>
-              <tr>
-                <th scope="col">Procedure</th>
-                <th scope="col" className="num">United States</th>
-                <th scope="col" className="num">India</th>
-                <th scope="col">You save</th>
-              </tr>
-            </thead>
-            <tbody>
-              {procedures.map((p) => {
-                const pct = Math.round((1 - p.price_india / p.price_us) * 100)
-                return (
-                  <tr key={p.id}>
-                    <th scope="row">
-                      {p.glyph ? <span className="glyph" aria-hidden="true">{p.glyph}</span> : null}
-                      {p.name}
-                    </th>
-
-                    <td className="num">
-                      <span className="fig fig-us">
-                        {showNative && p.us_label ? p.us_label : money(p.price_us, currency)}
-                      </span>
-                      {p.us_note ? <span className="fig-note">{p.us_note}</span> : null}
-                    </td>
-
-                    <td className="num">
-                      <span className="fig fig-in">
-                        {showNative && p.india_label ? p.india_label : money(p.price_india, currency)}
-                      </span>
-                      {p.note ? <span className="fig-note">{p.note}</span> : null}
-                    </td>
-
-                    <td>
-                      <div className="save">
-                        <span className="save-pct">{p.saving_label || pct + "%"}</span>
-                        <span className="save-track">
-                          <span
-                            className="save-fill"
-                            style={{ width: (seen ? Math.min(pct, 99) : 0) + "%" }}
-                          />
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <p className="table-foot">
-          US figures are national benchmarks for uninsured or out-of-network care and vary by state,
-          hospital and insurer. Indian figures are hospital benchmarks; rupee ranges reflect what our
-          partner hospitals are quoting now. Your own price is confirmed in writing before you travel.
-        </p>
-      </div>
-    </section>
-  )
-}
-
-function Journey() {
-  return (
-    <section id="journey" className="band">
-      <div className="shell">
-        <SectionHead
-          title="From your first message to your follow-up"
-          note="Seven steps. You are handed to a named coordinator at step two and keep them until step seven."
-        />
-
-        <ol className="steps">
-          {JOURNEY.map((s, i) => (
-            <li className="step" key={s.t}>
-              <span className="step-num">{i + 1}</span>
-              <div>
-                <h3>{s.t}</h3>
-                <p>{s.d}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  )
-}
-
-function Doctors({ doctors }) {
-  return (
-    <section id="doctors" className="band band-paper">
-      <div className="shell">
-        <SectionHead
-          title="Who will treat you"
-          note="You get the surgeon's name before you commit to anything — never a hospital name alone."
-        />
-
-        <div className="roster">
-          {doctors.slice(0, 8).map((d) => (
-            <article className="doc" key={d.id}>
-              {d.photo_url ? (
-                <img className="doc-photo" src={d.photo_url} alt="" />
-              ) : (
-                <span className={display.className + " doc-medallion"}>{initials(d.name)}</span>
-              )}
-              <div>
-                <h3>{d.name}</h3>
-                <p className="doc-spec">{d.specialty || d.specialties?.name}</p>
-                <p className="doc-meta">
-                  {d.experience_years ? d.experience_years + " years in practice" : "Consultant"}
-                  {d.hospital ? " · " + d.hospital : ""}
-                </p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Stories({ stories }) {
-  const withVideo = stories.filter((s) => s.video_url)
-  const lead = stories[0]
-
-  return (
-    <section className="band">
-      <div className="shell">
-        <SectionHead title="Patients who went" note="Recorded after discharge, unscripted." />
-
-        {lead && (
-          <figure className="pullquote">
-            <blockquote className={display.className}>
-              {lead.quote || lead.message || lead.text || "A short note from a patient will appear here."}
-            </blockquote>
-            <figcaption>
-              {lead.name}
-              {lead.country ? ", " + lead.country : ""}
-              {lead.procedure ? " — " + lead.procedure : ""}
-            </figcaption>
-          </figure>
-        )}
-
-        {withVideo.length > 0 && (
-          <div className="videos">
-            {withVideo.slice(0, 3).map((t) => (
-              <figure className="video" key={t.id}>
-                <div className="video-frame">
-                  <iframe
-                    src={embedUrl(t.video_url)}
-                    title={"Patient story — " + t.name}
-                    loading="lazy"
-                    allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-                <figcaption>
-                  <strong>{t.name}</strong>
-                  {t.country ? <span>{t.country}</span> : null}
-                  {t.procedure ? <span>{t.procedure}</span> : null}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function Faq({ open, setOpen }) {
-  return (
-    <section id="answers" className="band band-paper">
-      <div className="shell faq-shell">
-        <SectionHead title="The questions people actually ask" />
-
-        <div className="faq">
-          {FAQS.map((f, i) => {
-            const isOpen = open === i
-            return (
-              <div className={"faq-item" + (isOpen ? " is-open" : "")} key={f.q}>
-                <button type="button" onClick={() => setOpen(isOpen ? -1 : i)} aria-expanded={isOpen}>
-                  <span>{f.q}</span>
-                  <span className="faq-mark" aria-hidden="true" />
-                </button>
-                <div className="faq-body" hidden={!isOpen}>
-                  <p>{f.a}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Enquiry({ procedures }) {
+  const [activeDepartment, setActiveDepartment] = useState("All")
+  const [openFaq, setOpenFaq] = useState(null)
+  const [mobileMenu, setMobileMenu] = useState(false)
   const [form, setForm] = useState({
     name: "",
     email: "",
-    country: "",
     phone: "",
-    procedure: "",
+    country: "",
+    treatment: "",
     message: "",
   })
-  const [state, setState] = useState("idle") // idle | sending | sent | error
+  const [submitted, setSubmitted] = useState(false)
 
-  function set(key) {
-    return (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+  const currencyRates = {
+    USD: 1,
+    EUR: 0.86,
+    GBP: 0.74,
   }
 
-  async function submit(e) {
-    e.preventDefault()
-    setState("sending")
-    const { error } = await supabase.from("leads").insert([form])
-    setState(error ? "error" : "sent")
+  const currencySymbols = {
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+  }
+
+  const filteredProcedures = useMemo(() => {
+    if (activeDepartment === "All") return procedures
+
+    return procedures.filter((item) => {
+      if (activeDepartment === "Dental") return item.department === "Dental"
+      if (activeDepartment === "Cardiac") return item.department === "Cardiac"
+      if (activeDepartment === "Neuro") {
+        return (
+          item.department === "Neuro & Spine" ||
+          item.department === "Neurosurgery"
+        )
+      }
+      return true
+    })
+  }, [activeDepartment])
+
+  function formatPrice(value) {
+    const converted = Math.round(value * currencyRates[currency])
+
+    if (currency === "USD") {
+      return `$${converted.toLocaleString()}`
+    }
+
+    if (currency === "EUR") {
+      return `€${converted.toLocaleString()}`
+    }
+
+    return `£${converted.toLocaleString()}`
+  }
+
+  function handleFormChange(event) {
+    const { name, value } = event.target
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }))
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+
+    const message = [
+      `Hello Medpact, I would like to enquire about medical treatment in India.`,
+      ``,
+      `Name: ${form.name}`,
+      `Email: ${form.email}`,
+      `Phone: ${form.phone}`,
+      `Country: ${form.country}`,
+      `Treatment: ${form.treatment}`,
+      `Message: ${form.message}`,
+    ].join("\n")
+
+    openWhatsApp(message)
+    setSubmitted(true)
   }
 
   return (
-    <section id="enquire" className="band band-ink enquire">
-      <div className="shell enquire-grid">
-        <div className="enquire-copy">
-          <h2 className={display.className}>Send your reports. Get a real price.</h2>
-          <p>
-            Two consultants read your case and reply within 48 hours with an opinion and a written
-            package price. Nothing is charged, and nobody will call you at midnight.
-          </p>
+    <main className={`${newsreader.variable} ${publicSans.variable} site`}>
+      <header className="header">
+        <div className="header-inner">
+          <button
+            className="logo"
+            onClick={() => scrollToId("top")}
+            aria-label="Medpact home"
+          >
+            <span className="logo-mark">M</span>
+            <span>
+              <strong>medpact</strong>
+              <small>HEALTHCARE</small>
+            </span>
+          </button>
 
-          <ul className="contact-list">
-            <li>
-              <span>WhatsApp</span>
-              <a href={"https://wa.me/" + WHATSAPP} target="_blank" rel="noreferrer">
-                {PHONE_DISPLAY}
-              </a>
-            </li>
-            <li>
-              <span>Email</span>
-              <a href={"mailto:" + EMAIL}>{EMAIL}</a>
-            </li>
-            <li>
-              <span>Hours</span>
-              <span>Replies 24/7, including US and UK evenings</span>
-            </li>
-          </ul>
-        </div>
+          <nav className={`nav ${mobileMenu ? "nav-open" : ""}`}>
+            <button onClick={() => scrollToId("treatments")}>Treatments</button>
+            <button onClick={() => scrollToId("compare")}>Cost Guide</button>
+            <button onClick={() => scrollToId("specialists")}>Specialists</button>
+            <button onClick={() => scrollToId("journey")}>Your Journey</button>
+            <button onClick={() => scrollToId("faq")}>FAQ</button>
+          </nav>
 
-        {state === "sent" ? (
-          <div className="form-done">
-            <h3 className={display.className}>Your case is with our consultants.</h3>
-            <p>
-              You will get a reply at {form.email || "your email"} within 48 hours. If it is urgent,
-              message the same details on WhatsApp and a coordinator will pick it up now.
-            </p>
-            <a className="btn btn-jade" href={"https://wa.me/" + WHATSAPP} target="_blank" rel="noreferrer">
-              Continue on WhatsApp
-            </a>
-          </div>
-        ) : (
-          <form className="form" onSubmit={submit}>
-            <div className="form-row">
-              <label className="field">
-                <span className="field-label">Your name</span>
-                <input required value={form.name} onChange={set("name")} autoComplete="name" />
-              </label>
-              <label className="field">
-                <span className="field-label">Country</span>
-                <input required value={form.country} onChange={set("country")} placeholder="United States" />
-              </label>
+          <div className="header-actions">
+            <div className="currency">
+              {["USD", "EUR", "GBP"].map((item) => (
+                <button
+                  key={item}
+                  className={currency === item ? "active" : ""}
+                  onClick={() => setCurrency(item)}
+                >
+                  {item}
+                </button>
+              ))}
             </div>
 
-            <div className="form-row">
-              <label className="field">
-                <span className="field-label">Email</span>
-                <input required type="email" value={form.email} onChange={set("email")} autoComplete="email" />
-              </label>
-              <label className="field">
-                <span className="field-label">Phone or WhatsApp</span>
-                <input value={form.phone} onChange={set("phone")} autoComplete="tel" />
-              </label>
-            </div>
-
-            <label className="field">
-              <span className="field-label">What are you being treated for?</span>
-              <select value={form.procedure} onChange={set("procedure")}>
-                <option value="">I am not sure yet</option>
-                {procedures.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span className="field-label">Anything the consultant should know</span>
-              <textarea
-                rows={4}
-                value={form.message}
-                onChange={set("message")}
-                placeholder="Diagnosis, age, when you were hoping to travel, the quote you were given at home."
-              />
-            </label>
-
-            {state === "error" && (
-              <p className="form-error">
-                That did not send. Message the same details on WhatsApp and we will pick it up
-                straight away.
-              </p>
-            )}
-
-            <button className="btn btn-jade btn-block" type="submit" disabled={state === "sending"}>
-              {state === "sending" ? "Sending…" : "Request my estimate"}
+            <button
+              className="header-cta"
+              onClick={() => scrollToId("enquiry")}
+            >
+              Get a medical review
             </button>
-            <p className="form-small">
-              Your reports go to the treating consultant and nobody else. We do not sell enquiries.
-            </p>
-          </form>
-        )}
-      </div>
-    </section>
-  )
-}
 
-function SiteFooter() {
-  return (
-    <footer className="site-footer">
-      <div className="shell footer-grid">
-        <div>
-          <a className="wordmark" href="/">
-            MedPact<span className="wordmark-dot">.</span>
-          </a>
-          <p className="footer-line">
-            Medical travel for patients from the United States, United Kingdom and Europe.
-          </p>
+            <button
+              className="menu-button"
+              onClick={() => setMobileMenu((value) => !value)}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <section className="hero" id="top">
+        <div className="hero-glow hero-glow-one" />
+        <div className="hero-glow hero-glow-two" />
+
+        <div className="hero-inner">
+          <div className="hero-copy">
+            <div className="eyebrow">
+              <span className="eyebrow-dot" />
+              INTERNATIONAL PATIENT SERVICES
+            </div>
+
+            <h1>
+              Exceptional care.
+              <br />
+              <em>Closer than you think.</em>
+            </h1>
+
+            <p className="hero-text">
+              Explore specialist medical treatment in India with transparent
+              cost comparisons, experienced doctors and a coordinated journey
+              from your first enquiry to your return home.
+            </p>
+
+            <div className="hero-buttons">
+              <button
+                className="button button-primary"
+                onClick={() => scrollToId("enquiry")}
+              >
+                Start your medical enquiry
+                <span>→</span>
+              </button>
+
+              <button
+                className="button button-outline"
+                onClick={() => scrollToId("compare")}
+              >
+                Compare treatment costs
+              </button>
+            </div>
+
+            <div className="hero-trust">
+              <div className="trust-item">
+                <strong>01</strong>
+                <span>Medical record review</span>
+              </div>
+
+              <div className="trust-item">
+                <strong>02</strong>
+                <span>Specialist coordination</span>
+              </div>
+
+              <div className="trust-item">
+                <strong>03</strong>
+                <span>Travel assistance</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="hero-card-wrap">
+            <div className="hero-card">
+              <div className="card-top">
+                <span>YOUR INDIA CARE PLAN</span>
+                <span className="live-dot">●</span>
+              </div>
+
+              <div className="hero-card-main">
+                <div className="mini-icon">✦</div>
+
+                <h3>
+                  Begin with your
+                  <br />
+                  medical records.
+                </h3>
+
+                <p>
+                  Share your reports securely and receive guidance on suitable
+                  specialists and treatment options.
+                </p>
+              </div>
+
+              <div className="card-line" />
+
+              <div className="card-stats">
+                <div>
+                  <span>STEP</span>
+                  <strong>01 / 04</strong>
+                </div>
+
+                <div>
+                  <span>RESPONSE</span>
+                  <strong>Prompt</strong>
+                </div>
+              </div>
+
+              <button
+                className="card-button"
+                onClick={() => scrollToId("enquiry")}
+              >
+                Send my reports <span>↗</span>
+              </button>
+            </div>
+
+            <div className="floating-note note-one">
+              <span>✓</span>
+              Specialist coordination
+            </div>
+
+            <div className="floating-note note-two">
+              <span>◎</span>
+              International patient support
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="stats-strip">
+        <div className="stats-inner">
+          <div>
+            <strong>200+</strong>
+            <span>Hospitals across India</span>
+          </div>
+
+          <div>
+            <strong>25+</strong>
+            <span>Specialities</span>
+          </div>
+
+          <div>
+            <strong>1:1</strong>
+            <span>Patient coordination</span>
+          </div>
+
+          <div>
+            <strong>24/7</strong>
+            <span>Journey assistance</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="section opportunity" id="about">
+        <div className="section-inner two-column">
+          <div>
+            <div className="eyebrow">WHY INDIA</div>
+
+            <h2>
+              World-class medical expertise,
+              <br />
+              <em>with a different cost equation.</em>
+            </h2>
+          </div>
+
+          <div className="section-copy">
+            <p>
+              India has become an important destination for international
+              patients seeking complex medical treatment, specialist expertise
+              and access to advanced hospitals.
+            </p>
+
+            <p>
+              The right choice is not simply about price. It is about finding
+              the appropriate specialist, hospital, treatment pathway and level
+              of support for your individual medical situation.
+            </p>
+
+            <button
+              className="text-link"
+              onClick={() => scrollToId("journey")}
+            >
+              See how Medpact coordinates your journey <span>→</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="section treatment-section" id="treatments">
+        <div className="section-inner">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">SPECIALIST CARE</div>
+
+              <h2>
+                Start with the
+                <br />
+                <em>right department.</em>
+              </h2>
+            </div>
+
+            <p>
+              Explore some of the medical pathways commonly considered by
+              international patients travelling to India.
+            </p>
+          </div>
+
+          <div className="department-grid">
+            {departments.map((department) => (
+              <article
+                className={`department-card ${department.colorClass}`}
+                key={department.id}
+              >
+                <div className="department-icon">{department.icon}</div>
+
+                <div className="department-eyebrow">
+                  {department.eyebrow}
+                </div>
+
+                <h3>{department.name}</h3>
+
+                <p>{department.description}</p>
+
+                <div className="department-procedures">
+                  {department.procedures.map((procedure) => (
+                    <span key={procedure}>{procedure}</span>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setActiveDepartment(
+                      department.id === "dental"
+                        ? "Dental"
+                        : department.id === "cardiac"
+                        ? "Cardiac"
+                        : "Neuro"
+                    )
+
+                    setTimeout(() => scrollToId("compare"), 50)
+                  }}
+                  className="department-link"
+                >
+                  Explore procedures <span>→</span>
+                </button>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section comparison-section" id="compare">
+        <div className="section-inner">
+          <div className="comparison-top">
+            <div>
+              <div className="eyebrow">ILLUSTRATIVE COST GUIDE</div>
+
+              <h2>
+                See the difference
+                <br />
+                <em>before you travel.</em>
+              </h2>
+            </div>
+
+            <div className="comparison-intro">
+              <p>
+                International treatment costs can vary significantly between
+                markets. The figures below are illustrative benchmarks intended
+                to help you understand the broad cost landscape.
+              </p>
+
+              <div className="currency-note">
+                Display currency:{" "}
+                <strong>
+                  {currency} {currencySymbols[currency]}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="filter-row">
+            {["All", "Dental", "Cardiac", "Neuro"].map((item) => (
+              <button
+                key={item}
+                className={activeDepartment === item ? "active" : ""}
+                onClick={() => setActiveDepartment(item)}
+              >
+                {item === "Neuro" ? "Neuro & Spine" : item}
+              </button>
+            ))}
+          </div>
+
+          <div className="comparison-list">
+            {filteredProcedures.map((procedure) => {
+              const max = procedure.us
+
+              const indiaWidth = Math.max(
+                5,
+                Math.min(100, (procedure.india / max) * 100)
+              )
+
+              return (
+                <article className="comparison-row" key={procedure.id}>
+                  <div className="procedure-info">
+                    <div className="procedure-icon">{procedure.icon}</div>
+
+                    <div>
+                      <span>{procedure.department}</span>
+                      <h3>{procedure.name}</h3>
+                      <small>{procedure.stay} typical stay</small>
+                    </div>
+                  </div>
+
+                  <div className="price-comparison">
+                    <div className="price-line">
+                      <span className="price-label">U.S.</span>
+
+                      <div className="bar-track">
+                        <div
+                          className="bar us-bar"
+                          style={{ width: "100%" }}
+                        />
+                      </div>
+
+                      <strong>{procedure.usDisplay}</strong>
+                    </div>
+
+                    <div className="price-line">
+                      <span className="price-label">India</span>
+
+                      <div className="bar-track">
+                        <div
+                          className="bar india-bar"
+                          style={{ width: `${indiaWidth}%` }}
+                        />
+                      </div>
+
+                      <strong>
+                        {currency === "USD"
+                          ? procedure.indiaDisplay
+                          : formatPrice(procedure.india)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="comparison-action">
+                    <button
+                      onClick={() =>
+                        scrollToId("enquiry")
+                      }
+                    >
+                      Ask about this procedure <span>→</span>
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+
+          <div className="comparison-disclaimer">
+            <span>i</span>
+
+            <p>
+              <strong>About these figures:</strong> These are illustrative
+              international benchmarks, not quotations. Actual costs can vary
+              according to hospital, surgeon, diagnosis, procedure complexity,
+              implants or devices, investigations, accommodation and length of
+              stay. A personalised estimate should be obtained after medical
+              review.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="section economics">
+        <div className="section-inner economics-inner">
+          <div className="economics-card">
+            <div className="eyebrow">THE BIGGER PICTURE</div>
+
+            <h2>
+              Treatment cost is only
+              <br />
+              <em>one part of the equation.</em>
+            </h2>
+
+            <p>
+              When comparing international treatment options, consider the
+              complete journey — medical care, travel, accommodation,
+              rehabilitation and the time required away from home.
+            </p>
+
+            <div className="economics-grid">
+              <div>
+                <span>01</span>
+                <strong>Medical treatment</strong>
+                <small>Hospital + specialist care</small>
+              </div>
+
+              <div>
+                <span>02</span>
+                <strong>Travel</strong>
+                <small>Flights + local transfers</small>
+              </div>
+
+              <div>
+                <span>03</span>
+                <strong>Accommodation</strong>
+                <small>Patient + companion stay</small>
+              </div>
+
+              <div>
+                <span>04</span>
+                <strong>Recovery</strong>
+                <small>Follow-up + rehabilitation</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section journey-section" id="journey">
+        <div className="section-inner">
+          <div className="section-heading centered">
+            <div>
+              <div className="eyebrow">YOUR JOURNEY</div>
+
+              <h2>
+                From your first report
+                <br />
+                <em>to your return home.</em>
+              </h2>
+            </div>
+
+            <p>
+              Medical travel can feel complicated. Our role is to make the
+              process more structured, transparent and easier to navigate.
+            </p>
+          </div>
+
+          <div className="journey-line">
+            <div className="journey-step">
+              <div className="step-number">01</div>
+              <h3>Share your reports</h3>
+              <p>
+                Send medical records, scans, prescriptions and previous
+                treatment details.
+              </p>
+            </div>
+
+            <div className="journey-step">
+              <div className="step-number">02</div>
+              <h3>Medical review</h3>
+              <p>
+                We coordinate with appropriate specialists and hospitals for
+                preliminary assessment.
+              </p>
+            </div>
+
+            <div className="journey-step">
+              <div className="step-number">03</div>
+              <h3>Plan your visit</h3>
+              <p>
+                Discuss treatment, indicative costs, hospital options and
+                expected duration.
+              </p>
+            </div>
+
+            <div className="journey-step">
+              <div className="step-number">04</div>
+              <h3>Arrive in India</h3>
+              <p>
+                Coordinate appointments, hospital visits, local assistance and
+                follow-up.
+              </p>
+            </div>
+          </div>
+
+          <div className="journey-cta">
+            <div>
+              <span>READY TO EXPLORE YOUR OPTIONS?</span>
+              <h3>Let your medical records start the conversation.</h3>
+            </div>
+
+            <button
+              className="button button-primary"
+              onClick={() => scrollToId("enquiry")}
+            >
+              Begin my enquiry <span>→</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="section doctors-section" id="specialists">
+        <div className="section-inner">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">SPECIALIST NETWORK</div>
+
+              <h2>
+                Experience matters.
+                <br />
+                <em>So does the right match.</em>
+              </h2>
+            </div>
+
+            <p>
+              A medical tourism decision should begin with the clinical
+              question: which specialist and treatment pathway are appropriate
+              for your condition?
+            </p>
+          </div>
+
+          <div className="doctors-grid">
+            {doctors.map((doctor) => (
+              <article className="doctor-card" key={doctor.name}>
+                <div className="doctor-photo">
+                  <span>{doctor.initials}</span>
+                </div>
+
+                <div className="doctor-info">
+                  <span className="doctor-location">
+                    {doctor.location}
+                  </span>
+
+                  <h3>{doctor.name}</h3>
+
+                  <p>{doctor.specialty}</p>
+
+                  <div className="doctor-bottom">
+                    <strong>{doctor.experience}</strong>
+
+                    <button onClick={() => scrollToId("enquiry")}>
+                      Enquire <span>→</span>
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section stories-section">
+        <div className="section-inner">
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">PATIENT EXPERIENCES</div>
+
+              <h2>
+                The journey is
+                <br />
+                <em>more than the procedure.</em>
+              </h2>
+            </div>
+
+            <p>
+              A coordinated medical journey can make a significant difference
+              when treatment involves travelling to another country.
+            </p>
+          </div>
+
+          <div className="stories-grid">
+            {testimonials.map((story) => (
+              <article className="story-card" key={story.name}>
+                <div className="story-video">
+                  <div className="play-button">▶</div>
+                  <span>VIDEO TESTIMONIAL</span>
+                </div>
+
+                <div className="story-body">
+                  <div className="stars">★★★★★</div>
+
+                  <p>“{story.text}”</p>
+
+                  <div className="story-person">
+                    <div className="avatar">
+                      {story.name.charAt(0)}
+                    </div>
+
+                    <div>
+                      <strong>{story.name}</strong>
+                      <span>
+                        {story.country} · {story.procedure}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="video-note">
+            <span>VIDEO</span>
+            <p>
+              Patient videos can be added here later without changing the page
+              structure.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="section faq-section" id="faq">
+        <div className="section-inner faq-inner">
+          <div>
+            <div className="eyebrow">QUESTIONS</div>
+
+            <h2>
+              Before you
+              <br />
+              <em>make the journey.</em>
+            </h2>
+
+            <p className="faq-intro">
+              Have another question? Talk to our international patient team.
+            </p>
+
+            <button
+              className="text-link"
+              onClick={() => scrollToId("enquiry")}
+            >
+              Ask us directly <span>→</span>
+            </button>
+          </div>
+
+          <div className="faq-list">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaq === index
+
+              return (
+                <div className={`faq-item ${isOpen ? "open" : ""}`} key={faq.q}>
+                  <button
+                    onClick={() =>
+                      setOpenFaq(isOpen ? null : index)
+                    }
+                  >
+                    <span>{faq.q}</span>
+                    <strong>{isOpen ? "−" : "+"}</strong>
+                  </button>
+
+                  <div className="faq-answer">
+                    <p>{faq.a}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="section enquiry-section" id="enquiry">
+        <div className="section-inner enquiry-grid">
+          <div className="enquiry-copy">
+            <div className="eyebrow">PRIVATE MEDICAL ENQUIRY</div>
+
+            <h2>
+              Tell us what
+              <br />
+              <em>you need.</em>
+            </h2>
+
+            <p>
+              Start with a conversation. Share your condition, previous
+              treatment and what you are looking for. We can then guide you
+              through the next steps.
+            </p>
+
+            <div className="contact-details">
+              <div>
+                <span>EMAIL</span>
+                <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+              </div>
+
+              <div>
+                <span>PHONE</span>
+                <a href={`tel:${PHONE.replace(/\s/g, "")}`}>
+                  {PHONE}
+                </a>
+              </div>
+
+              <div>
+                <span>WHATSAPP</span>
+                <button
+                  onClick={() =>
+                    openWhatsApp(
+                      "Hello Medpact, I would like to discuss medical treatment in India."
+                    )
+                  }
+                >
+                  Start a conversation →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="enquiry-form-card">
+            {submitted ? (
+              <div className="success-state">
+                <div className="success-icon">✓</div>
+
+                <h3>Your enquiry is ready.</h3>
+
+                <p>
+                  We opened WhatsApp with your enquiry details. Send the message
+                  there so our team can start the conversation.
+                </p>
+
+                <button
+                  className="button button-primary"
+                  onClick={() => {
+                    setSubmitted(false)
+                    openWhatsApp()
+                  }}
+                >
+                  Open WhatsApp again <span>→</span>
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit}>
+                <div className="form-heading">
+                  <span>01</span>
+                  <h3>Tell us about your treatment</h3>
+                </div>
+
+                <div className="form-grid">
+                  <label>
+                    <span>Your name</span>
+                    <input
+                      name="name"
+                      value={form.name}
+                      onChange={handleFormChange}
+                      placeholder="Full name"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleFormChange}
+                      placeholder="you@example.com"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Phone / WhatsApp</span>
+                    <input
+                      name="phone"
+                      value={form.phone}
+                      onChange={handleFormChange}
+                      placeholder="+1..."
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Country</span>
+                    <input
+                      name="country"
+                      value={form.country}
+                      onChange={handleFormChange}
+                      placeholder="Country of residence"
+                    />
+                  </label>
+                </div>
+
+                <label className="full-field">
+                  <span>Treatment / condition</span>
+                  <input
+                    name="treatment"
+                    value={form.treatment}
+                    onChange={handleFormChange}
+                    placeholder="e.g. Knee replacement"
+                    required
+                  />
+                </label>
+
+                <label className="full-field">
+                  <span>Tell us more</span>
+                  <textarea
+                    name="message"
+                    value={form.message}
+                    onChange={handleFormChange}
+                    placeholder="Briefly describe your condition, previous treatment or what you would like to know."
+                    rows="5"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="button button-primary submit-button"
+                >
+                  Continue with WhatsApp <span>→</span>
+                </button>
+
+                <small className="form-note">
+                  Please do not share highly sensitive information through this
+                  form. Detailed medical records can be shared through the
+                  appropriate secure channel after initial contact.
+                </small>
+              </form>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <footer className="footer">
+        <div className="footer-inner">
+          <div className="footer-brand">
+            <div className="footer-logo">
+              <span className="logo-mark">M</span>
+
+              <span>
+                <strong>medpact</strong>
+                <small>HEALTHCARE</small>
+              </span>
+            </div>
+
+            <p>
+              Connecting international patients with specialist healthcare
+              pathways in India.
+            </p>
+          </div>
+
+          <div className="footer-column">
+            <span>EXPLORE</span>
+            <button onClick={() => scrollToId("treatments")}>
+              Treatments
+            </button>
+            <button onClick={() => scrollToId("compare")}>
+              Cost Guide
+            </button>
+            <button onClick={() => scrollToId("specialists")}>
+              Specialists
+            </button>
+            <button onClick={() => scrollToId("journey")}>
+              Your Journey
+            </button>
+          </div>
+
+          <div className="footer-column">
+            <span>CONTACT</span>
+            <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+            <a href={`tel:${PHONE.replace(/\s/g, "")}`}>{PHONE}</a>
+            <button onClick={() => openWhatsApp()}>
+              WhatsApp
+            </button>
+          </div>
+
+          <div className="footer-column">
+            <span>MEDICAL TOURISM</span>
+            <p>India</p>
+            <p>International Patients</p>
+            <p>Specialist Care</p>
+          </div>
         </div>
 
-        <nav className="footer-nav">
-          <a href="#specialities">Treatments</a>
-          <a href="#prices">Prices</a>
-          <a href="#journey">How it works</a>
-          <a href="#doctors">Doctors</a>
-          <a href="#answers">Answers</a>
-          <a href="#enquire">Contact</a>
-        </nav>
+        <div className="footer-bottom">
+          <span>© {new Date().getFullYear()} Medpact Healthcare</span>
 
-        <p className="footer-legal">
-          MedPact arranges care with independently accredited hospitals and does not practise
-          medicine. Prices shown are indicative until confirmed by the treating consultant.
-        </p>
-      </div>
-    </footer>
-  )
-}
+          <span>
+            Medical information is for general guidance and does not constitute
+            medical advice.
+          </span>
+        </div>
+      </footer>
 
-function SectionHead({ title, note, invert }) {
-  return (
-    <div className={"section-head" + (invert ? " is-invert" : "")}>
-      <h2 className={display.className}>{title}</h2>
-      {note ? <p>{note}</p> : null}
-    </div>
-  )
-}
-
-function WhatsAppMark() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-      <path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.3-1.39a9.86 9.86 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm0 18.02c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.37c0-4.54 3.7-8.23 8.25-8.23 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 0 1 2.41 5.82c0 4.54-3.7 8.22-8.24 8.22Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.24-.64.8-.78.97-.14.16-.29.18-.53.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.22.25-.85.83-.85 2.03s.87 2.35.99 2.51c.12.16 1.71 2.61 4.14 3.66.58.25 1.03.4 1.38.51.58.19 1.11.16 1.53.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.22-.17-.47-.29Z" />
-    </svg>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  STYLES                                                             */
-/* ------------------------------------------------------------------ */
-
-function GlobalStyles() {
-  return (
-    <style jsx global>{`
-      :root {
-        --ink: #11251f;
-        --ink-soft: #1c3a32;
-        --jade: #1f6f5c;
-        --jade-light: #4c9b86;
-        --marigold: #e0a33c;
-        --paper: #fbfaf7;
-        --paper-warm: #f3f1ea;
-        --mist: #dfe5e1;
-        --text: #1a2420;
-        --text-soft: #56655f;
-        --line: rgba(17, 37, 31, 0.12);
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      html {
-        scroll-behavior: smooth;
-        scroll-padding-top: 88px;
-      }
-
-      body {
-        margin: 0;
-      }
-
-      .page {
-        background: var(--paper);
-        color: var(--text);
-        font-size: 17px;
-        line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      .page h1,
-      .page h2,
-      .page h3 {
-        margin: 0;
-        font-weight: 400;
-        letter-spacing: -0.01em;
-      }
-
-      .page p {
-        margin: 0;
-      }
-
-      .page a {
-        color: inherit;
-      }
-
-      .shell {
-        width: min(1140px, calc(100% - 48px));
-        margin: 0 auto;
-      }
-
-      :focus-visible {
-        outline: 2px solid var(--jade);
-        outline-offset: 3px;
-        border-radius: 3px;
-      }
-
-      /* ---------- buttons ---------- */
-
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 14px 24px;
-        border: 1px solid transparent;
-        border-radius: 999px;
-        font: inherit;
-        font-weight: 600;
-        font-size: 16px;
-        text-decoration: none;
-        cursor: pointer;
-        transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-      }
-      .btn-sm {
-        padding: 9px 18px;
-        font-size: 14.5px;
-      }
-      .btn-block {
-        width: 100%;
-      }
-      .btn-dark {
-        background: var(--ink);
-        color: var(--paper);
-      }
-      .btn-dark:hover {
-        background: var(--ink-soft);
-      }
-      .btn-jade {
-        background: var(--jade);
-        color: #fff;
-      }
-      .btn-jade:hover {
-        background: #195b4c;
-      }
-      .btn-jade:disabled {
-        background: var(--jade-light);
-        cursor: default;
-      }
-      .btn-plain {
-        background: transparent;
-        color: var(--ink);
-        border-color: var(--line);
-      }
-      .btn-plain:hover {
-        border-color: var(--ink);
-      }
-
-      .link-underline {
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 15px;
-        color: var(--jade);
-        border-bottom: 1px solid currentColor;
-        padding-bottom: 2px;
-      }
-
-      /* ---------- header ---------- */
-
-      .site-header {
-        position: sticky;
-        top: 0;
-        z-index: 50;
-        background: transparent;
-        transition: background 0.2s ease, border-color 0.2s ease;
-        border-bottom: 1px solid transparent;
-      }
-      .site-header.is-solid {
-        background: rgba(251, 250, 247, 0.92);
-        backdrop-filter: blur(10px);
-        border-bottom-color: var(--line);
-      }
-      .header-inner {
-        display: flex;
-        align-items: center;
-        gap: 32px;
-        height: 72px;
-      }
-      .wordmark {
-        font-size: 21px;
-        font-weight: 700;
-        letter-spacing: -0.03em;
-        text-decoration: none;
-        color: var(--ink);
-      }
-      .wordmark-dot {
-        color: var(--marigold);
-      }
-      .header-nav {
-        display: flex;
-        gap: 26px;
-        margin-left: auto;
-      }
-      .header-nav a {
-        text-decoration: none;
-        font-size: 15.5px;
-        color: var(--text-soft);
-      }
-      .header-nav a:hover {
-        color: var(--ink);
-      }
-
-      /* ---------- hero ---------- */
-
-      .hero {
-        padding: 56px 0 84px;
-        background:
-          radial-gradient(900px 420px at 88% -8%, rgba(31, 111, 92, 0.1), transparent 70%),
-          var(--paper);
-      }
-      .hero-grid {
-        display: grid;
-        grid-template-columns: 1.05fr 0.95fr;
-        gap: 64px;
-        align-items: start;
-      }
-      .hero-kicker {
-        font-size: 14.5px;
-        font-weight: 600;
-        color: var(--jade);
-        margin-bottom: 20px !important;
-      }
-      .hero-title {
-        font-size: clamp(42px, 5.4vw, 68px);
-        line-height: 1.04;
-        letter-spacing: -0.028em;
-        color: var(--ink);
-      }
-      .hero-lede {
-        margin-top: 26px !important;
-        max-width: 46ch;
-        font-size: 18px;
-        color: var(--text-soft);
-      }
-      .hero-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 32px;
-      }
-      .hero-note {
-        margin-top: 18px !important;
-        font-size: 14.5px;
-        color: var(--text-soft);
-      }
-
-      /* ---------- estimate card ---------- */
-
-      .estimate {
-        background: #fff;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 26px;
-        box-shadow: 0 24px 60px -34px rgba(17, 37, 31, 0.45);
-      }
-      .estimate-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid var(--line);
-      }
-      .estimate-title {
-        font-size: 15px;
-        font-weight: 600;
-        color: var(--text-soft);
-      }
-      .currency-switch {
-        display: inline-flex;
-        background: var(--paper-warm);
-        border-radius: 999px;
-        padding: 3px;
-      }
-      .currency-switch button {
-        border: 0;
-        background: transparent;
-        font: inherit;
-        font-size: 13.5px;
-        font-weight: 600;
-        color: var(--text-soft);
-        padding: 5px 11px;
-        border-radius: 999px;
-        cursor: pointer;
-      }
-      .currency-switch .is-on {
-        background: var(--ink);
-        color: var(--paper);
-      }
-
-      .field {
-        display: block;
-        margin-top: 18px;
-      }
-      .field-label {
-        display: block;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-soft);
-        margin-bottom: 7px;
-      }
-      .field select,
-      .field input,
-      .field textarea {
-        width: 100%;
-        font: inherit;
-        font-size: 16px;
-        color: var(--text);
-        background: var(--paper);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 12px 14px;
-        appearance: none;
-      }
-      .field textarea {
-        resize: vertical;
-      }
-      .field select:focus,
-      .field input:focus,
-      .field textarea:focus {
-        border-color: var(--jade);
-        outline: none;
-      }
-
-      .ledger {
-        margin: 22px 0 0;
-      }
-      .ledger-row {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 11px 0;
-        border-bottom: 1px dashed var(--line);
-        font-size: 15.5px;
-      }
-      .ledger-row dt {
-        color: var(--text-soft);
-      }
-      .ledger-row dd {
-        margin: 0;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-      }
-      .ledger-row .strike {
-        text-decoration: line-through;
-        color: var(--text-soft);
-        font-weight: 500;
-      }
-      .ledger-row.muted dd {
-        color: var(--text-soft);
-        font-weight: 500;
-      }
-      .ledger-row.total {
-        border-bottom: 0;
-        padding-top: 16px;
-        align-items: center;
-      }
-      .ledger-row.total dt {
-        color: var(--ink);
-        font-weight: 600;
-        font-size: 17px;
-      }
-      .ledger-row.total dd {
-        font-size: 30px;
-        color: var(--jade);
-        letter-spacing: -0.02em;
-      }
-
-      .estimate-foot {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-        font-size: 14px;
-        color: var(--text-soft);
-        margin-bottom: 18px;
-      }
-      .cut-badge {
-        background: rgba(224, 163, 60, 0.18);
-        color: #8a5c07;
-        font-weight: 700;
-        font-size: 13px;
-        padding: 4px 10px;
-        border-radius: 999px;
-      }
-      .estimate-small {
-        margin-top: 14px !important;
-        font-size: 13.5px;
-        line-height: 1.5;
-        color: var(--text-soft);
-      }
-
-      /* ---------- assurances ---------- */
-
-      .assurances {
-        border-top: 1px solid var(--line);
-        border-bottom: 1px solid var(--line);
-        background: var(--paper-warm);
-        padding: 34px 0;
-      }
-      .assurance-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 36px;
-      }
-      .assurance h3 {
-        font-size: 16px;
-        font-weight: 700;
-        margin-bottom: 6px;
-      }
-      .assurance p {
-        font-size: 14.5px;
-        line-height: 1.5;
-        color: var(--text-soft);
-      }
-
-      /* ---------- section frame ---------- */
-
-      .band {
-        padding: 86px 0;
-      }
-      .band-paper {
-        background: var(--paper-warm);
-      }
-      .band-ink {
-        background: var(--ink);
-        color: var(--paper);
-      }
-      .section-head {
-        max-width: 60ch;
-        margin-bottom: 48px;
-      }
-      .section-head h2 {
-        font-size: clamp(30px, 3.4vw, 42px);
-        line-height: 1.12;
-        letter-spacing: -0.022em;
-        color: var(--ink);
-      }
-      .section-head p {
-        margin-top: 14px !important;
-        color: var(--text-soft);
-        font-size: 17px;
-      }
-      .section-head.is-invert h2 {
-        color: var(--paper);
-      }
-      .section-head.is-invert p {
-        color: rgba(251, 250, 247, 0.66);
-      }
-
-      /* ---------- specialities ---------- */
-
-      .spec-list {
-        border-top: 1px solid var(--line);
-      }
-      .spec {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 48px;
-        align-items: start;
-        padding: 32px 0;
-        border-bottom: 1px solid var(--line);
-      }
-      .spec-main h3 {
-        font-size: 27px;
-        color: var(--ink);
-      }
-      .spec-main > p {
-        margin-top: 8px !important;
-        color: var(--text-soft);
-        max-width: 58ch;
-      }
-      .spec-procs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        list-style: none;
-        margin: 18px 0 0;
-        padding: 0;
-      }
-      .spec-procs li {
-        font-size: 14px;
-        background: var(--paper-warm);
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 5px 13px;
-        color: var(--text-soft);
-      }
-      .band-paper .spec-procs li {
-        background: #fff;
-      }
-      .spec-side {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 4px;
-        text-align: right;
-      }
-      .spec-from {
-        font-size: 13.5px;
-        color: var(--text-soft);
-      }
-      .spec-price {
-        font-size: 34px;
-        color: var(--ink);
-        letter-spacing: -0.02em;
-      }
-      .spec-side .link-underline {
-        margin-top: 8px;
-      }
-
-      /* ---------- price table ---------- */
-
-      .table-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      .price-table {
-        width: 100%;
-        min-width: 680px;
-        border-collapse: collapse;
-        text-align: left;
-      }
-      .price-table thead th {
-        font-size: 13.5px;
-        font-weight: 600;
-        color: rgba(251, 250, 247, 0.5);
-        padding: 0 0 14px;
-        border-bottom: 1px solid rgba(251, 250, 247, 0.22);
-      }
-      .price-table tbody th,
-      .price-table tbody td {
-        padding: 18px 0;
-        border-bottom: 1px solid rgba(251, 250, 247, 0.12);
-        vertical-align: top;
-      }
-      .price-table tbody th {
-        font-size: 17px;
-        font-weight: 600;
-        padding-right: 28px;
-        white-space: nowrap;
-      }
-      .price-table .glyph {
-        margin-right: 10px;
-        font-size: 17px;
-      }
-      .price-table .num {
-        text-align: right;
-        padding-right: 40px !important;
-      }
-      .price-table thead th.num {
-        padding-right: 40px;
-      }
-      .fig {
-        display: block;
-        font-size: 16.5px;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
-      .fig-us {
-        color: rgba(251, 250, 247, 0.62);
-        text-decoration: line-through;
-        text-decoration-color: rgba(251, 250, 247, 0.32);
-      }
-      .fig-in {
-        color: var(--paper);
-      }
-      .fig-note {
-        display: block;
-        margin-top: 4px;
-        font-size: 12.5px;
-        line-height: 1.4;
-        color: rgba(251, 250, 247, 0.45);
-        white-space: normal;
-      }
-      .save {
-        min-width: 150px;
-      }
-      .save-pct {
-        display: block;
-        font-size: 16.5px;
-        font-weight: 700;
-        color: var(--marigold);
-        margin-bottom: 8px;
-      }
-      .save-track {
-        display: block;
-        height: 6px;
-        background: rgba(251, 250, 247, 0.12);
-        border-radius: 999px;
-        overflow: hidden;
-      }
-      .save-fill {
-        display: block;
-        height: 100%;
-        width: 0;
-        border-radius: 999px;
-        background: var(--marigold);
-        transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
-      }
-      .table-foot {
-        margin-top: 26px !important;
-        max-width: 78ch;
-        font-size: 13.5px;
-        line-height: 1.6;
-        color: rgba(251, 250, 247, 0.5);
-      }
-
-      /* ---------- journey ---------- */
-
-      .steps {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0 64px;
-      }
-      .step {
-        display: flex;
-        gap: 20px;
-        padding: 22px 0;
-        border-top: 1px solid var(--line);
-      }
-      .step-num {
-        flex: none;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        border: 1px solid var(--jade);
-        color: var(--jade);
-        display: grid;
-        place-items: center;
-        font-size: 14px;
-        font-weight: 700;
-        margin-top: 2px;
-      }
-      .step h3 {
-        font-size: 18px;
-        font-weight: 600;
-      }
-      .step p {
-        margin-top: 5px !important;
-        color: var(--text-soft);
-        font-size: 15.5px;
-        line-height: 1.55;
-      }
-
-      /* ---------- doctors ---------- */
-
-      .roster {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0 64px;
-      }
-      .doc {
-        display: flex;
-        gap: 18px;
-        align-items: center;
-        padding: 22px 0;
-        border-top: 1px solid var(--line);
-      }
-      .doc-medallion,
-      .doc-photo {
-        flex: none;
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        object-fit: cover;
-      }
-      .doc-medallion {
-        display: grid;
-        place-items: center;
-        background: var(--ink);
-        color: var(--paper);
-        font-size: 20px;
-        letter-spacing: 0.02em;
-      }
-      .doc h3 {
-        font-size: 18px;
-        font-weight: 600;
-      }
-      .doc-spec {
-        color: var(--jade);
-        font-size: 15px;
-        font-weight: 600;
-      }
-      .doc-meta {
-        font-size: 14.5px;
-        color: var(--text-soft);
-      }
-
-      /* ---------- stories ---------- */
-
-      .pullquote {
-        margin: 0 0 56px;
-        max-width: 26ch;
-        max-width: 62ch;
-      }
-      .pullquote blockquote {
-        margin: 0;
-        font-size: clamp(24px, 2.8vw, 34px);
-        line-height: 1.35;
-        color: var(--ink);
-        font-style: italic;
-        letter-spacing: -0.015em;
-      }
-      .pullquote figcaption {
-        margin-top: 18px;
-        font-size: 15px;
-        color: var(--text-soft);
-      }
-      .videos {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 28px;
-      }
-      .video {
-        margin: 0;
-      }
-      .video-frame {
-        position: relative;
-        padding-top: 56.25%;
-        border-radius: 12px;
-        overflow: hidden;
-        background: var(--mist);
-      }
-      .video-frame iframe {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        border: 0;
-      }
-      .video figcaption {
-        margin-top: 12px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        font-size: 14.5px;
-        color: var(--text-soft);
-      }
-      .video figcaption strong {
-        color: var(--text);
-      }
-
-      /* ---------- faq ---------- */
-
-      .faq-shell {
-        width: min(820px, calc(100% - 48px));
-      }
-      .faq {
-        border-top: 1px solid var(--line);
-      }
-      .faq-item {
-        border-bottom: 1px solid var(--line);
-      }
-      .faq-item button {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 24px;
-        background: none;
-        border: 0;
-        padding: 22px 0;
-        font: inherit;
-        font-size: 18px;
-        font-weight: 600;
-        color: var(--ink);
-        text-align: left;
-        cursor: pointer;
-      }
-      .faq-mark {
-        flex: none;
-        position: relative;
-        width: 14px;
-        height: 14px;
-      }
-      .faq-mark::before,
-      .faq-mark::after {
-        content: "";
-        position: absolute;
-        background: var(--jade);
-        transition: transform 0.2s ease;
-      }
-      .faq-mark::before {
-        top: 6px;
-        left: 0;
-        width: 14px;
-        height: 2px;
-      }
-      .faq-mark::after {
-        left: 6px;
-        top: 0;
-        width: 2px;
-        height: 14px;
-      }
-      .faq-item.is-open .faq-mark::after {
-        transform: scaleY(0);
-      }
-      .faq-body {
-        padding-bottom: 24px;
-      }
-      .faq-body p {
-        max-width: 68ch;
-        color: var(--text-soft);
-      }
-
-      /* ---------- enquiry ---------- */
-
-      .enquire-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 72px;
-        align-items: start;
-      }
-      .enquire-copy h2 {
-        font-size: clamp(30px, 3.4vw, 42px);
-        line-height: 1.12;
-        letter-spacing: -0.022em;
-        color: var(--paper);
-        max-width: 16ch;
-      }
-      .enquire-copy > p {
-        margin-top: 18px !important;
-        color: rgba(251, 250, 247, 0.7);
-        max-width: 46ch;
-      }
-      .contact-list {
-        list-style: none;
-        padding: 0;
-        margin: 36px 0 0;
-        border-top: 1px solid rgba(251, 250, 247, 0.16);
-      }
-      .contact-list li {
-        display: flex;
-        justify-content: space-between;
-        gap: 20px;
-        padding: 14px 0;
-        border-bottom: 1px solid rgba(251, 250, 247, 0.16);
-        font-size: 15.5px;
-      }
-      .contact-list li span:first-child {
-        color: rgba(251, 250, 247, 0.55);
-      }
-      .contact-list a {
-        text-decoration: none;
-        border-bottom: 1px solid rgba(251, 250, 247, 0.4);
-      }
-
-      .form,
-      .form-done {
-        background: var(--paper);
-        color: var(--text);
-        border-radius: 18px;
-        padding: 30px;
-      }
-      .form .field:first-child,
-      .form-row:first-child .field {
-        margin-top: 0;
-      }
-      .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-      }
-      .form .btn {
-        margin-top: 24px;
-      }
-      .form-small {
-        margin-top: 14px !important;
-        font-size: 13.5px;
-        color: var(--text-soft);
-        text-align: center;
-      }
-      .form-error {
-        margin-top: 18px !important;
-        font-size: 14.5px;
-        color: #a4341f;
-        background: rgba(164, 52, 31, 0.08);
-        border-radius: 10px;
-        padding: 12px 14px;
-      }
-      .form-done h3 {
-        font-size: 26px;
-        color: var(--ink);
-      }
-      .form-done p {
-        margin: 14px 0 24px !important;
-        color: var(--text-soft);
-      }
-
-      /* ---------- footer ---------- */
-
-      .site-footer {
-        background: var(--paper-warm);
-        border-top: 1px solid var(--line);
-        padding: 48px 0 72px;
-      }
-      .footer-grid {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 24px 48px;
-      }
-      .footer-line {
-        margin-top: 10px !important;
-        font-size: 15px;
-        color: var(--text-soft);
-        max-width: 40ch;
-      }
-      .footer-nav {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 18px;
-        align-items: flex-start;
-      }
-      .footer-nav a {
-        text-decoration: none;
-        font-size: 15px;
-        color: var(--text-soft);
-      }
-      .footer-nav a:hover {
-        color: var(--ink);
-      }
-      .footer-legal {
-        grid-column: 1 / -1;
-        margin-top: 24px !important;
-        padding-top: 22px;
-        border-top: 1px solid var(--line);
-        font-size: 13.5px;
-        color: var(--text-soft);
-        max-width: 80ch;
-      }
-
-      /* ---------- whatsapp ---------- */
-
-      .whatsapp-float {
-        position: fixed;
-        right: 20px;
-        bottom: 20px;
-        z-index: 60;
-        display: inline-flex;
-        align-items: center;
-        gap: 9px;
-        background: #1f6f5c;
-        color: #fff;
-        text-decoration: none;
-        font-size: 15px;
-        font-weight: 600;
-        padding: 12px 18px;
-        border-radius: 999px;
-        box-shadow: 0 14px 30px -12px rgba(17, 37, 31, 0.6);
-      }
-      .whatsapp-float:hover {
-        background: #195b4c;
-      }
-
-      /* ---------- responsive ---------- */
-
-      @media (max-width: 1000px) {
-        .hero-grid,
-        .enquire-grid {
-          grid-template-columns: 1fr;
-          gap: 44px;
+      <button
+        className="floating-whatsapp"
+        onClick={() =>
+          openWhatsApp(
+            "Hello Medpact, I would like to explore medical treatment in India."
+          )
         }
-        .assurance-grid {
-          grid-template-columns: repeat(2, 1fr);
-          gap: 28px;
-        }
-        .steps,
-        .roster {
-          grid-template-columns: 1fr;
-          gap: 0;
-        }
-      }
+        aria-label="Contact Medpact on WhatsApp"
+      >
+        <span>◔</span>
+        <strong>WhatsApp</strong>
+      </button>
 
-      @media (max-width: 720px) {
-        .shell,
-        .faq-shell {
-          width: calc(100% - 32px);
+      <style jsx global>{`
+        :root {
+          --ink: #17231f;
+          --muted: #68736f;
+          --soft: #f5f7f4;
+          --paper: #fbfcfa;
+          --green: #1c5b4c;
+          --green-dark: #123f35;
+          --green-soft: #e8f0ec;
+          --gold: #b8955b;
+          --line: #dce3df;
+          --white: #ffffff;
+          --display: var(--font-display);
+          --body: var(--font-body);
         }
-        .header-nav {
-          display: none;
+
+        * {
+          box-sizing: border-box;
         }
+
+        html {
+          scroll-behavior: smooth;
+        }
+
+        body {
+          margin: 0;
+          background: var(--paper);
+          color: var(--ink);
+          font-family: var(--body);
+          -webkit-font-smoothing: antialiased;
+        }
+
+        button,
+        input,
+        textarea {
+          font: inherit;
+        }
+
+        button {
+          cursor: pointer;
+        }
+
+        a {
+          color: inherit;
+          text-decoration: none;
+        }
+
+        .site {
+          min-height: 100vh;
+          overflow: hidden;
+          background:
+            radial-gradient(
+              circle at 80% 0%,
+              rgba(210, 226, 217, 0.45),
+              transparent 28%
+            ),
+            var(--paper);
+        }
+
+        .header {
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          border-bottom: 1px solid rgba(220, 227, 223, 0.8);
+          background: rgba(251, 252, 250, 0.92);
+          backdrop-filter: blur(18px);
+        }
+
         .header-inner {
+          width: min(1380px, calc(100% - 56px));
+          min-height: 82px;
+          margin: auto;
+          display: flex;
+          align-items: center;
           justify-content: space-between;
+          gap: 30px;
         }
-        .band {
-          padding: 60px 0;
+
+        .logo {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          border: 0;
+          background: transparent;
+          color: var(--ink);
+          padding: 0;
         }
+
+        .logo-mark {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          background: var(--green);
+          color: white;
+          font-family: var(--display);
+          font-size: 23px;
+          font-weight: 500;
+        }
+
+        .logo strong {
+          display: block;
+          font-size: 21px;
+          letter-spacing: -0.8px;
+          line-height: 18px;
+        }
+
+        .logo small {
+          display: block;
+          margin-top: 5px;
+          color: var(--muted);
+          font-size: 7px;
+          letter-spacing: 2px;
+          font-weight: 700;
+        }
+
+        .nav {
+          display: flex;
+          align-items: center;
+          gap: 26px;
+          margin-left: auto;
+        }
+
+        .nav button {
+          border: 0;
+          background: transparent;
+          color: #4e5a55;
+          font-size: 13px;
+          padding: 10px 0;
+          transition: color 0.2s ease;
+        }
+
+        .nav button:hover {
+          color: var(--green);
+        }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+
+        .currency {
+          display: flex;
+          padding: 3px;
+          border: 1px solid var(--line);
+          border-radius: 999px;
+          background: white;
+        }
+
+        .currency button {
+          border: 0;
+          background: transparent;
+          color: var(--muted);
+          border-radius: 999px;
+          padding: 7px 9px;
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .currency button.active {
+          background: var(--green);
+          color: white;
+        }
+
+        .header-cta {
+          border: 0;
+          background: var(--ink);
+          color: white;
+          padding: 12px 18px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .menu-button {
+          display: none;
+          border: 0;
+          background: transparent;
+          font-size: 25px;
+        }
+
         .hero {
-          padding: 32px 0 60px;
+          position: relative;
+          min-height: 720px;
+          overflow: hidden;
+          background:
+            linear-gradient(
+              120deg,
+              #f5f8f4 0%,
+              #edf3ee 48%,
+              #e3ece6 100%
+            );
         }
-        .spec {
-          grid-template-columns: 1fr;
+
+        .hero-inner {
+          position: relative;
+          z-index: 2;
+          width: min(1380px, calc(100% - 56px));
+          min-height: 720px;
+          margin: auto;
+          display: grid;
+          grid-template-columns: 1.05fr 0.95fr;
+          align-items: center;
+          gap: 70px;
+          padding: 80px 0;
+        }
+
+        .hero-glow {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(2px);
+          pointer-events: none;
+        }
+
+        .hero-glow-one {
+          width: 500px;
+          height: 500px;
+          right: -120px;
+          top: -120px;
+          background: rgba(255, 255, 255, 0.55);
+        }
+
+        .hero-glow-two {
+          width: 300px;
+          height: 300px;
+          left: 35%;
+          bottom: -160px;
+          background: rgba(184, 149, 91, 0.08);
+        }
+
+        .eyebrow {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          color: var(--green);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 2.1px;
+        }
+
+        .eyebrow-dot {
+          width: 6px;
+          height: 6px;
+          background: var(--gold);
+          border-radius: 50%;
+        }
+
+        .hero h1 {
+          max-width: 760px;
+          margin: 23px 0 24px;
+          font-family: var(--display);
+          font-size: clamp(58px, 6.3vw, 91px);
+          line-height: 0.92;
+          font-weight: 400;
+          letter-spacing: -4px;
+        }
+
+        h1 em,
+        h2 em {
+          color: var(--green);
+          font-style: italic;
+        }
+
+        .hero-text {
+          max-width: 630px;
+          margin: 0;
+          color: #59645f;
+          font-size: 16px;
+          line-height: 1.8;
+        }
+
+        .hero-buttons {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 34px;
+        }
+
+        .button {
+          min-height: 50px;
+          padding: 0 22px;
+          border-radius: 4px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           gap: 20px;
+          border: 1px solid transparent;
+          font-size: 12px;
+          font-weight: 700;
+          transition:
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
         }
-        .spec-side {
-          align-items: flex-start;
-          text-align: left;
+
+        .button:hover {
+          transform: translateY(-2px);
         }
-        .form-row {
-          grid-template-columns: 1fr;
-          gap: 0;
+
+        .button-primary {
+          background: var(--green);
+          color: white;
+          box-shadow: 0 12px 30px rgba(28, 91, 76, 0.18);
         }
-        .form-row .field + .field {
+
+        .button-outline {
+          background: rgba(255, 255, 255, 0.45);
+          border-color: #cbd6d0;
+          color: var(--ink);
+        }
+
+        .hero-trust {
+          display: flex;
+          gap: 30px;
+          margin-top: 50px;
+          padding-top: 25px;
+          border-top: 1px solid #d4ded8;
+        }
+
+        .trust-item {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .trust-item strong {
+          color: var(--gold);
+          font-size: 10px;
+          letter-spacing: 1px;
+        }
+
+        .trust-item span {
+          color: #5c6762;
+          font-size: 11px;
+        }
+
+        .hero-card-wrap {
+          position: relative;
+          min-height: 500px;
+          display: grid;
+          place-items: center;
+        }
+
+        .hero-card {
+          position: relative;
+          width: min(460px, 100%);
+          min-height: 470px;
+          padding: 28px;
+          border: 1px solid rgba(255, 255, 255, 0.7);
+          background:
+            linear-gradient(
+              150deg,
+              rgba(255, 255, 255, 0.92),
+              rgba(242, 248, 244, 0.88)
+            );
+          box-shadow: 0 30px 80px rgba(24, 51, 43, 0.14);
+          border-radius: 5px;
+          transform: rotate(1deg);
+        }
+
+        .card-top {
+          display: flex;
+          justify-content: space-between;
+          color: #68746e;
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 1.7px;
+        }
+
+        .live-dot {
+          color: #5d9b78;
+          font-size: 9px;
+        }
+
+        .hero-card-main {
+          padding: 80px 10px 50px;
+        }
+
+        .mini-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          background: var(--green);
+          color: white;
+          font-size: 19px;
+          margin-bottom: 26px;
+        }
+
+        .hero-card h3 {
+          margin: 0;
+          font-family: var(--display);
+          font-size: 43px;
+          line-height: 0.98;
+          font-weight: 400;
+          letter-spacing: -1.7px;
+        }
+
+        .hero-card p {
+          max-width: 350px;
+          margin: 23px 0 0;
+          color: #68736e;
+          font-size: 13px;
+          line-height: 1.7;
+        }
+
+        .card-line {
+          height: 1px;
+          background: #dce4df;
+        }
+
+        .card-stats {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          padding: 23px 10px;
+          gap: 30px;
+        }
+
+        .card-stats div {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+
+        .card-stats span {
+          color: #87918c;
+          font-size: 8px;
+          letter-spacing: 1.5px;
+          font-weight: 800;
+        }
+
+        .card-stats strong {
+          font-size: 13px;
+        }
+
+        .card-button {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border: 0;
+          background: var(--ink);
+          color: white;
+          padding: 15px 17px;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .floating-note {
+          position: absolute;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 12px 15px;
+          border: 1px solid rgba(215, 225, 220, 0.8);
+          background: rgba(255, 255, 255, 0.88);
+          box-shadow: 0 14px 35px rgba(27, 57, 48, 0.1);
+          border-radius: 4px;
+          font-size: 10px;
+          font-weight: 700;
+          color: #53615a;
+          backdrop-filter: blur(8px);
+        }
+
+        .floating-note span {
+          color: var(--green);
+        }
+
+        .note-one {
+          left: -20px;
+          top: 105px;
+        }
+
+        .note-two {
+          right: -25px;
+          bottom: 90px;
+        }
+
+        .stats-strip {
+          background: var(--green-dark);
+          color: white;
+        }
+
+        .stats-inner {
+          width: min(1380px, calc(100% - 56px));
+          margin: auto;
+          min-height: 112px;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+        }
+
+        .stats-inner > div {
+          padding: 25px 35px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 6px;
+          border-right: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .stats-inner > div:last-child {
+          border-right: 0;
+        }
+
+        .stats-inner strong {
+          font-family: var(--display);
+          font-size: 30px;
+          font-weight: 400;
+        }
+
+        .stats-inner span {
+          color: #b8cbc3;
+          font-size: 10px;
+          letter-spacing: 0.7px;
+        }
+
+        .section {
+          padding: 120px 0;
+        }
+
+        .section-inner {
+          width: min(1380px, calc(100% - 56px));
+          margin: auto;
+        }
+
+        .two-column {
+          display: grid;
+          grid-template-columns: 1fr 0.8fr;
+          gap: 120px;
+          align-items: start;
+        }
+
+        h2 {
+          margin: 20px 0 0;
+          font-family: var(--display);
+          font-size: clamp(46px, 5vw, 70px);
+          font-weight: 400;
+          line-height: 0.98;
+          letter-spacing: -2.8px;
+        }
+
+        .section-copy {
+          padding-top: 25px;
+        }
+
+        .section-copy p {
+          color: var(--muted);
+          font-size: 15px;
+          line-height: 1.9;
+          margin: 0 0 20px;
+        }
+
+        .text-link {
+          border: 0;
+          background: transparent;
+          padding: 10px 0;
+          color: var(--green);
+          font-weight: 800;
+          font-size: 12px;
+        }
+
+        .text-link span {
+          margin-left: 14px;
+        }
+
+        .treatment-section {
+          background: #f3f6f3;
+        }
+
+        .section-heading {
+          display: grid;
+          grid-template-columns: 1fr 0.65fr;
+          gap: 80px;
+          align-items: end;
+          margin-bottom: 55px;
+        }
+
+        .section-heading > p {
+          color: var(--muted);
+          font-size: 14px;
+          line-height: 1.8;
+          margin: 0;
+        }
+
+        .department-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
+        }
+
+        .department-card {
+          position: relative;
+          min-height: 485px;
+          padding: 35px;
+          overflow: hidden;
+          background: white;
+          border: 1px solid #e1e7e3;
+          transition:
+            transform 0.25s ease,
+            box-shadow 0.25s ease;
+        }
+
+        .department-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 20px 50px rgba(32, 54, 46, 0.08);
+        }
+
+        .department-card::after {
+          content: "";
+          position: absolute;
+          width: 230px;
+          height: 230px;
+          border-radius: 50%;
+          right: -90px;
+          top: -90px;
+          opacity: 0.5;
+        }
+
+        .department-card.dental::after {
+          background: #eee9dd;
+        }
+
+        .department-card.cardiac::after {
+          background: #e8e1e1;
+        }
+
+        .department-card.neuro::after {
+          background: #e0e8e3;
+        }
+
+        .department-icon {
+          position: relative;
+          z-index: 1;
+          width: 58px;
+          height: 58px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: var(--soft);
+          font-size: 27px;
+        }
+
+        .department-eyebrow {
+          margin-top: 75px;
+          color: var(--gold);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 1.6px;
+        }
+
+        .department-card h3 {
+          margin: 10px 0 14px;
+          font-family: var(--display);
+          font-size: 43px;
+          font-weight: 400;
+          letter-spacing: -1.4px;
+        }
+
+        .department-card p {
+          min-height: 82px;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.75;
+        }
+
+        .department-procedures {
+          display: flex;
+          flex-direction: column;
+          margin-top: 25px;
+          border-top: 1px solid var(--line);
+        }
+
+        .department-procedures span {
+          padding: 10px 0;
+          border-bottom: 1px solid var(--line);
+          font-size: 10px;
+          color: #56615d;
+        }
+
+        .department-link {
+          margin-top: 25px;
+          border: 0;
+          background: transparent;
+          padding: 0;
+          color: var(--green);
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .department-link span {
+          margin-left: 10px;
+        }
+
+        .comparison-section {
+          background: var(--paper);
+        }
+
+        .comparison-top {
+          display: grid;
+          grid-template-columns: 1fr 0.7fr;
+          gap: 100px;
+          align-items: end;
+        }
+
+        .comparison-intro p {
+          color: var(--muted);
+          font-size: 14px;
+          line-height: 1.8;
+          margin: 0 0 20px;
+        }
+
+        .currency-note {
+          display: inline-block;
+          padding: 10px 13px;
+          background: var(--green-soft);
+          color: var(--green);
+          font-size: 10px;
+          letter-spacing: 0.3px;
+        }
+
+        .filter-row {
+          display: flex;
+          gap: 7px;
+          margin: 55px 0 25px;
+        }
+
+        .filter-row button {
+          border: 1px solid var(--line);
+          background: white;
+          color: #69746f;
+          padding: 10px 16px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .filter-row button.active {
+          background: var(--green);
+          color: white;
+          border-color: var(--green);
+        }
+
+        .comparison-list {
+          border-top: 1px solid var(--line);
+        }
+
+        .comparison-row {
+          display: grid;
+          grid-template-columns: 280px 1fr 190px;
+          gap: 35px;
+          align-items: center;
+          padding: 24px 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .procedure-info {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .procedure-icon {
+          flex: 0 0 auto;
+          width: 43px;
+          height: 43px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #f1f4f1;
+          font-size: 19px;
+        }
+
+        .procedure-info span {
+          display: block;
+          color: var(--gold);
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 1.1px;
+          text-transform: uppercase;
+        }
+
+        .procedure-info h3 {
+          margin: 4px 0;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .procedure-info small {
+          color: #8a9490;
+          font-size: 9px;
+        }
+
+        .price-comparison {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .price-line {
+          display: grid;
+          grid-template-columns: 43px 1fr 130px;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .price-label {
+          color: #78827d;
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+
+        .bar-track {
+          height: 8px;
+          overflow: hidden;
+          background: #edf0ee;
+          border-radius: 999px;
+        }
+
+        .bar {
+          height: 100%;
+          border-radius: 999px;
+        }
+
+        .us-bar {
+          background: #9da9a3;
+        }
+
+        .india-bar {
+          background: var(--green);
+        }
+
+        .price-line strong {
+          text-align: right;
+          font-size: 11px;
+        }
+
+        .comparison-action {
+          text-align: right;
+        }
+
+        .comparison-action button {
+          border: 0;
+          background: transparent;
+          color: var(--green);
+          font-size: 10px;
+          font-weight: 800;
+          line-height: 1.5;
+          text-align: right;
+        }
+
+        .comparison-action span {
+          margin-left: 6px;
+        }
+
+        .comparison-disclaimer {
+          display: flex;
+          gap: 12px;
+          margin-top: 28px;
+          padding: 18px;
+          background: #f3f6f3;
+          border: 1px solid #e2e8e4;
+        }
+
+        .comparison-disclaimer > span {
+          flex: 0 0 auto;
+          width: 21px;
+          height: 21px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: var(--green);
+          color: white;
+          font-size: 10px;
+        }
+
+        .comparison-disclaimer p {
+          margin: 0;
+          color: #66716c;
+          font-size: 10px;
+          line-height: 1.7;
+        }
+
+        .comparison-disclaimer strong {
+          color: var(--ink);
+        }
+
+        .economics {
+          padding-top: 20px;
+          background: #f3f6f3;
+        }
+
+        .economics-card {
+          padding: 70px;
+          background: var(--green-dark);
+          color: white;
+        }
+
+        .economics-card .eyebrow {
+          color: #a8c4b8;
+        }
+
+        .economics-card h2 {
           margin-top: 18px;
         }
-        .price-table {
-          min-width: 620px;
-        }
-        .price-table .num {
-          padding-right: 24px !important;
-        }
-        .table-wrap {
-          margin-right: -16px;
-          padding-right: 16px;
-        }
-        .footer-grid {
-          grid-template-columns: 1fr;
-        }
-        .whatsapp-float span {
-          display: none;
-        }
-        .whatsapp-float {
-          padding: 14px;
-        }
-      }
 
-      @media (prefers-reduced-motion: reduce) {
-        html {
-          scroll-behavior: auto;
+        .economics-card h2 em {
+          color: #bdd2c8;
         }
-        .save-fill {
-          transition: none;
+
+        .economics-card > p {
+          max-width: 680px;
+          margin: 28px 0 45px;
+          color: #b5c7bf;
+          font-size: 13px;
+          line-height: 1.8;
         }
-      }
-    `}</style>
+
+        .economics-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          border-top: 1px solid rgba(255, 255, 255, 0.16);
+        }
+
+        .economics-grid > div {
+          padding: 24px 20px 0 0;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          border-right: 1px solid rgba(255, 255, 255, 0.16);
+          margin-right: 20px;
+        }
+
+        .economics-grid > div:last-child {
+          border-right: 0;
+        }
+
+        .economics-grid span {
+          color: #a8c4b8;
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        .economics-grid strong {
+          font-family: var(--display);
+          font-size: 23px;
+          font-weight: 400;
+        }
+
+        .economics-grid small {
+          color: #9eb4aa;
+          font-size: 9px;
+        }
+
+        .journey-section {
+          background: white;
+        }
+
+        .centered {
+          max-width: 900px;
+          margin-left: auto;
+          margin-right: auto;
+          text-align: center;
+        }
+
+        .centered .eyebrow {
+          justify-content: center;
+        }
+
+        .centered > p {
+          max-width: 630px;
+          margin: 25px auto 0;
+        }
+
+        .journey-line {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          margin-top: 70px;
+          border-top: 1px solid var(--line);
+        }
+
+        .journey-step {
+          position: relative;
+          padding: 35px 35px 0 0;
+          margin-right: 35px;
+          border-right: 1px solid var(--line);
+        }
+
+        .journey-step:last-child {
+          border-right: 0;
+        }
+
+        .step-number {
+          display: inline-grid;
+          place-items: center;
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          background: var(--green);
+          color: white;
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .journey-step h3 {
+          margin: 28px 0 12px;
+          font-family: var(--display);
+          font-size: 25px;
+          font-weight: 400;
+        }
+
+        .journey-step p {
+          margin: 0;
+          color: var(--muted);
+          font-size: 11px;
+          line-height: 1.8;
+        }
+
+        .journey-cta {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 30px;
+          margin-top: 70px;
+          padding: 30px 35px;
+          background: #f1f5f2;
+        }
+
+        .journey-cta span {
+          color: var(--gold);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 1.5px;
+        }
+
+        .journey-cta h3 {
+          margin: 8px 0 0;
+          font-family: var(--display);
+          font-size: 27px;
+          font-weight: 400;
+        }
+
+        .doctors-section {
+          background: #f4f6f4;
+        }
+
+        .doctors-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+        }
+
+        .doctor-card {
+          background: white;
+          border: 1px solid #e2e7e3;
+        }
+
+        .doctor-photo {
+          height: 270px;
+          display: grid;
+          place-items: center;
+          background:
+            radial-gradient(circle at 50% 30%, #dce7e1 0 17%, transparent 18%),
+            linear-gradient(145deg, #eaf0ec, #d9e4de);
+        }
+
+        .doctor-photo span {
+          width: 92px;
+          height: 92px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.8);
+          color: var(--green);
+          font-family: var(--display);
+          font-size: 30px;
+          box-shadow: 0 15px 35px rgba(33, 65, 54, 0.08);
+        }
+
+        .doctor-info {
+          padding: 24px;
+        }
+
+        .doctor-location {
+          color: var(--gold);
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+        }
+
+        .doctor-info h3 {
+          margin: 9px 0 4px;
+          font-family: var(--display);
+          font-size: 26px;
+          font-weight: 400;
+        }
+
+        .doctor-info p {
+          min-height: 36px;
+          margin: 0;
+          color: var(--muted);
+          font-size: 10px;
+        }
+
+        .doctor-bottom {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-top: 23px;
+          padding-top: 16px;
+          border-top: 1px solid var(--line);
+        }
+
+        .doctor-bottom strong {
+          font-size: 9px;
+        }
+
+        .doctor-bottom button {
+          border: 0;
+          background: transparent;
+          color: var(--green);
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        .stories-section {
+          background: white;
+        }
+
+        .stories-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
+        }
+
+        .story-card {
+          border: 1px solid #e1e7e3;
+          background: #fbfcfb;
+        }
+
+        .story-video {
+          height: 220px;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background:
+            linear-gradient(
+              135deg,
+              rgba(28, 91, 76, 0.9),
+              rgba(16, 52, 44, 0.95)
+            );
+          color: white;
+        }
+
+        .story-video span {
+          position: absolute;
+          bottom: 15px;
+          left: 18px;
+          color: #bbd1c7;
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 1.5px;
+        }
+
+        .play-button {
+          width: 54px;
+          height: 54px;
+          display: grid;
+          place-items: center;
+          padding-left: 3px;
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          border-radius: 50%;
+          font-size: 13px;
+        }
+
+        .story-body {
+          padding: 25px;
+        }
+
+        .stars {
+          color: var(--gold);
+          font-size: 10px;
+          letter-spacing: 2px;
+        }
+
+        .story-body > p {
+          min-height: 115px;
+          margin: 18px 0;
+          color: #58645f;
+          font-family: var(--display);
+          font-size: 20px;
+          line-height: 1.35;
+        }
+
+        .story-person {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding-top: 18px;
+          border-top: 1px solid var(--line);
+        }
+
+        .avatar {
+          width: 35px;
+          height: 35px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: var(--green-soft);
+          color: var(--green);
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .story-person strong,
+        .story-person span {
+          display: block;
+        }
+
+        .story-person strong {
+          font-size: 10px;
+        }
+
+        .story-person span {
+          margin-top: 3px;
+          color: #87918c;
+          font-size: 8px;
+        }
+
+        .video-note {
+          display: flex;
+          gap: 15px;
+          align-items: center;
+          margin-top: 25px;
+          padding: 14px 18px;
+          background: #f3f6f3;
+        }
+
+        .video-note span {
+          color: var(--green);
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 1.4px;
+        }
+
+        .video-note p {
+          margin: 0;
+          color: #68736e;
+          font-size: 9px;
+        }
+
+        .faq-section {
+          background: #f3f6f3;
+        }
+
+        .faq-inner {
+          display: grid;
+          grid-template-columns: 0.7fr 1.1fr;
+          gap: 120px;
+        }
+
+        .faq-intro {
+          max-width: 300px;
+          margin: 30px 0 15px;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.7;
+        }
+
+        .faq-list {
+          border-top: 1px solid var(--line);
+        }
+
+        .faq-item {
+          border-bottom: 1px solid var(--line);
+        }
+
+        .faq-item > button {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          border: 0;
+          background: transparent;
+          padding: 22px 0;
+          color: var(--ink);
+          text-align: left;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .faq-item > button strong {
+          color: var(--green);
+          font-size: 20px;
+          font-weight: 400;
+        }
+
+        .faq-answer {
+          display: grid;
+          grid-template-rows: 0fr;
+          transition: grid-template-rows 0.3s ease;
+        }
+
+        .faq-answer p {
+          overflow: hidden;
+          margin: 0;
+          color: var(--muted);
+          font-size: 11px;
+          line-height: 1.8;
+        }
+
+        .faq-item.open .faq-answer {
+          grid-template-rows: 1fr;
+        }
+
+        .faq-item.open .faq-answer p {
+          padding-bottom: 22px;
+        }
+
+        .enquiry-section {
+          background: var(--green-dark);
+          color: white;
+        }
+
+        .enquiry-grid {
+          display: grid;
+          grid-template-columns: 0.8fr 1fr;
+          gap: 100px;
+          align-items: center;
+        }
+
+        .enquiry-copy .eyebrow {
+          color: #a8c4b8;
+        }
+
+        .enquiry-copy h2 {
+          margin-top: 20px;
+        }
+
+        .enquiry-copy h2 em {
+          color: #bdd2c8;
+        }
+
+        .enquiry-copy > p {
+          max-width: 470px;
+          margin: 28px 0 35px;
+          color: #b7c8c0;
+          font-size: 13px;
+          line-height: 1.8;
+        }
+
+        .contact-details {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .contact-details > div {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .contact-details span {
+          color: #8eaca0;
+          font-size: 8px;
+          letter-spacing: 1.5px;
+          font-weight: 800;
+        }
+
+        .contact-details a,
+        .contact-details button {
+          width: fit-content;
+          border: 0;
+          padding: 0;
+          background: transparent;
+          color: white;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .enquiry-form-card {
+          padding: 38px;
+          background: white;
+          color: var(--ink);
+        }
+
+        .form-heading {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          margin-bottom: 28px;
+          padding-bottom: 20px;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .form-heading span {
+          color: var(--gold);
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        .form-heading h3 {
+          margin: 0;
+          font-family: var(--display);
+          font-size: 26px;
+          font-weight: 400;
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 17px;
+        }
+
+        label {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+
+        label > span {
+          color: #707b76;
+          font-size: 9px;
+          font-weight: 700;
+        }
+
+        input,
+        textarea {
+          width: 100%;
+          border: 1px solid #dce3df;
+          background: #fafcfb;
+          color: var(--ink);
+          border-radius: 2px;
+          padding: 12px 13px;
+          outline: none;
+          font-size: 11px;
+          resize: vertical;
+        }
+
+        input:focus,
+        textarea:focus {
+          border-color: var(--green);
+          background: white;
+        }
+
+        .full-field {
+          margin-top: 17px;
+        }
+
+        .submit-button {
+          width: 100%;
+          margin-top: 22px;
+        }
+
+        .form-note {
+          display: block;
+          margin-top: 14px;
+          color: #8a9490;
+          font-size: 8px;
+          line-height: 1.6;
+        }
+
+        .success-state {
+          min-height: 470px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: flex-start;
+        }
+
+        .success-icon {
+          width: 58px;
+          height: 58px;
+          display: grid;
+          place-items: center;
+          margin-bottom: 22px;
+          border-radius: 50%;
+          background: var(--green-soft);
+          color: var(--green);
+          font-size: 22px;
+        }
+
+        .success-state h3 {
+          margin: 0;
+          font-family: var(--display);
+          font-size: 36px;
+          font-weight: 400;
+        }
+
+        .success-state p {
+          max-width: 470px;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.8;
+          margin: 15px 0 25px;
+        }
+
+        .footer {
+          background: #102e27;
+          color: white;
+        }
+
+        .footer-inner {
+          width: min(1380px, calc(100% - 56px));
+          margin: auto;
+          padding: 70px 0 50px;
+          display: grid;
+          grid-template-columns: 1.5fr 0.7fr 0.8fr 0.9fr;
+          gap: 60px;
+        }
+
+        .footer-logo {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+        }
+
+        .footer-logo strong {
+          display: block;
+          font-size: 20px;
+          line-height: 17px;
+        }
+
+        .footer-logo small {
+          display: block;
+          margin-top: 5px;
+          color: #78948a;
+          font-size: 7px;
+          letter-spacing: 2px;
+        }
+
+        .footer-brand > p {
+          max-width: 280px;
+          margin-top: 25px;
+          color: #8da59d;
+          font-size: 10px;
+          line-height: 1.8;
+        }
+
+        .footer-column {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+
+        .footer-column > span {
+          margin-bottom: 8px;
+          color: #759189;
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 1.6px;
+        }
+
+        .footer-column button,
+        .footer-column a,
+        .footer-column p {
+          border: 0;
+          background: transparent;
+          padding: 0;
+          margin: 0;
+          color: #d3ded9;
+          font-size: 10px;
+        }
+
+        .footer-bottom {
+          width: min(1380px, calc(100% - 56px));
+          margin: auto;
+          padding: 18px 0 25px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+          color: #718b83;
+          font-size: 8px;
+        }
+
+        .floating-whatsapp {
+          position: fixed;
+          z-index: 150;
+          right: 24px;
+          bottom: 24px;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          border: 0;
+          background: var(--green);
+          color: white;
+          padding: 12px 16px;
+          border-radius: 999px;
+          box-shadow: 0 15px 35px rgba(19, 64, 53, 0.25);
+          font-size: 10px;
+        }
+
+        .floating-whatsapp span {
+          font-size: 18px;
+        }
+
+        @media (max-width: 1100px) {
+          .nav {
+            gap: 15px;
+          }
+
+          .header-cta {
+            display: none;
+          }
+
+          .hero-inner {
+            gap: 40px;
+          }
+
+          .comparison-row {
+            grid-template-columns: 250px 1fr;
+          }
+
+          .comparison-action {
+            display: none;
+          }
+
+          .doctors-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .faq-inner,
+          .enquiry-grid {
+            gap: 60px;
+          }
+        }
+
+        @media (max-width: 800px) {
+          .header-inner,
+          .section-inner,
+          .stats-inner,
+          .footer-inner,
+          .footer-bottom {
+            width: min(100% - 32px, 680px);
+          }
+
+          .header-inner {
+            min-height: 70px;
+          }
+
+          .nav {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            top: 70px;
+            display: none;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+            padding: 12px 18px;
+            background: rgba(251, 252, 250, 0.98);
+            border: 1px solid var(--line);
+            box-shadow: 0 15px 40px rgba(20, 40, 33, 0.1);
+          }
+
+          .nav.nav-open {
+            display: flex;
+          }
+
+          .nav button {
+            padding: 13px 0;
+            text-align: left;
+            border-bottom: 1px solid #edf0ee;
+          }
+
+          .menu-button {
+            display: block;
+          }
+
+          .currency {
+            display: none;
+          }
+
+          .hero-inner {
+            min-height: auto;
+            grid-template-columns: 1fr;
+            padding: 70px 0 80px;
+          }
+
+          .hero h1 {
+            font-size: clamp(51px, 15vw, 72px);
+            letter-spacing: -3px;
+          }
+
+          .hero-card-wrap {
+            min-height: 450px;
+          }
+
+          .hero-card {
+            width: min(430px, 90%);
+          }
+
+          .note-one {
+            left: 0;
+          }
+
+          .note-two {
+            right: 0;
+          }
+
+          .stats-inner {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .stats-inner > div:nth-child(2) {
+            border-right: 0;
+          }
+
+          .stats-inner > div:nth-child(3),
+          .stats-inner > div:nth-child(4) {
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+          }
+
+          .section {
+            padding: 80px 0;
+          }
+
+          .two-column,
+          .section-heading,
+          .comparison-top,
+          .faq-inner,
+          .enquiry-grid {
+            grid-template-columns: 1fr;
+            gap: 35px;
+          }
+
+          h2 {
+            font-size: 49px;
+          }
+
+          .department-grid,
+          .stories-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .department-card {
+            min-height: auto;
+          }
+
+          .department-card p {
+            min-height: auto;
+          }
+
+          .comparison-row {
+            grid-template-columns: 1fr;
+            gap: 18px;
+            padding: 24px 0;
+          }
+
+          .price-line {
+            grid-template-columns: 40px 1fr 110px;
+          }
+
+          .economics-card {
+            padding: 40px 25px;
+          }
+
+          .economics-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .economics-grid > div:nth-child(2) {
+            border-right: 0;
+          }
+
+          .journey-line {
+            grid-template-columns: 1fr;
+            border-top: 0;
+          }
+
+          .journey-step {
+            padding: 25px 0;
+            margin: 0;
+            border-right: 0;
+            border-top: 1px solid var(--line);
+          }
+
+          .journey-cta {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .doctors-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .doctor-photo {
+            height: 240px;
+          }
+
+          .footer-inner {
+            grid-template-columns: 1fr 1fr;
+            gap: 45px 30px;
+          }
+
+          .footer-brand {
+            grid-column: 1 / -1;
+          }
+
+          .footer-bottom {
+            flex-direction: column;
+          }
+        }
+
+        @media (max-width: 500px) {
+          .hero-buttons {
+            flex-direction: column;
+          }
+
+          .hero-buttons .button {
+            width: 100%;
+          }
+
+          .hero-trust {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+          }
+
+          .hero-card {
+            min-height: 430px;
+            padding: 23px;
+          }
+
+          .hero-card-main {
+            padding: 65px 5px 40px;
+          }
+
+          .hero-card h3 {
+            font-size: 37px;
+          }
+
+          .floating-note {
+            font-size: 8px;
+            padding: 10px 11px;
+          }
+
+          .note-one {
+            left: -8px;
+          }
+
+          .note-two {
+            right: -8px;
+          }
+
+          .filter-row {
+            overflow-x: auto;
+            padding-bottom: 5px;
+          }
+
+          .filter-row button {
+            flex: 0 0 auto;
+          }
+
+          .price-line {
+            grid-template-columns: 36px 1fr 90px;
+          }
+
+          .price-line strong {
+            font-size: 9px;
+          }
+
+          .economics-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .economics-grid > div {
+            border-right: 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            padding-bottom: 18px;
+            margin-right: 0;
+          }
+
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .enquiry-form-card {
+            padding: 25px 20px;
+          }
+
+          .footer-inner {
+            grid-template-columns: 1fr;
+          }
+
+          .floating-whatsapp {
+            right: 15px;
+            bottom: 15px;
+          }
+        }
+      `}</style>
+    </main>
   )
 }
