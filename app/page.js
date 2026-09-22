@@ -53,7 +53,7 @@ useEffect(() => {
 
   // 🌍 If care domain → go to medical tourism
   if (host.includes("care.medpact.in")) {
-    router.replace("/medicaltourism")
+    router.replace("/medicalneeds")
     return
   }
 
