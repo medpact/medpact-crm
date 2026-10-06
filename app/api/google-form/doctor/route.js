@@ -27,6 +27,29 @@ export async function POST(request) {
 
   try {
 
+    // ---------------------------------------------
+    // SECURITY CHECK
+    // ---------------------------------------------
+
+    const secret = request.headers.get("GOOGLE_FORM_SECRET_KISHORE")
+
+    if (
+      !secret ||
+      secret !== process.env.GOOGLE_FORM_SECRET
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized"
+        },
+        { status: 401 }
+      )
+    }
+
+    // ---------------------------------------------
+    // READ REQUEST
+    // ---------------------------------------------
+
     const body = await request.json()
 
     const name = clean(body.name)
@@ -39,8 +62,12 @@ export async function POST(request) {
     const cityName = clean(body.city)
     const preferredLocation = clean(body.preferred_location)
     const expectedCTC = clean(body.expected_ctc)
-    const availability = clean(body.availability) || "available"
+    const availabilityInput = clean(body.availability)
     const remarks = clean(body.remarks)
+
+    // ---------------------------------------------
+    // BASIC VALIDATION
+    // ---------------------------------------------
 
     if (!name) {
       return NextResponse.json(
@@ -62,63 +89,121 @@ export async function POST(request) {
       )
     }
 
-    // ------------------------------------------------
-    // 1. CHECK DUPLICATE DOCTOR
-    // ------------------------------------------------
-
-    let existingDoctor = null
-
-    if (phone) {
-
-      const normalizedPhone = normalizePhone(phone)
-
-      const { data: doctorsByPhone } = await supabase
-        .from("doctors")
-        .select("id,name,phone,email")
-        .not("phone", "is", null)
-
-      existingDoctor = doctorsByPhone?.find(
-        doctor =>
-          normalizePhone(doctor.phone) === normalizedPhone
+    if (!phone) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Phone is required"
+        },
+        { status: 400 }
       )
     }
 
-    if (!existingDoctor && email) {
+    // ---------------------------------------------
+    // AVAILABILITY MAPPING
+    // ---------------------------------------------
 
-      const normalizedEmail = normalizeEmail(email)
+    let availability = "available"
 
-      const { data: doctorsByEmail } = await supabase
-        .from("doctors")
-        .select("id,name,phone,email")
-        .not("email", "is", null)
+    if (
+      availabilityInput.toLowerCase() ===
+      "not available"
+    ) {
+      availability = "not_available"
+    }
 
-      existingDoctor = doctorsByEmail?.find(
-        doctor =>
-          normalizeEmail(doctor.email) === normalizedEmail
+    if (
+      availabilityInput.toLowerCase() ===
+      "in process"
+    ) {
+      availability = "in_process"
+    }
+
+    // ---------------------------------------------
+    // CHECK DUPLICATE BY PHONE
+    // ---------------------------------------------
+
+    const normalizedPhone = normalizePhone(phone)
+
+    const {
+      data: doctorsByPhone,
+      error: phoneError
+    } = await supabase
+      .from("doctors")
+      .select("id,name,phone,email")
+
+    if (phoneError) {
+      console.log(phoneError)
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unable to check existing doctors"
+        },
+        { status: 500 }
       )
     }
 
-    if (existingDoctor) {
+    const existingByPhone =
+      doctorsByPhone?.find(
+        doctor =>
+          normalizePhone(doctor.phone) ===
+          normalizedPhone
+      )
+
+    if (existingByPhone) {
 
       return NextResponse.json({
         success: false,
         duplicate: true,
-        message: "Doctor already exists",
-        doctor_id: existingDoctor.id,
-        doctor_name: existingDoctor.name
+        message: "Doctor with this phone number already exists",
+        doctor_id: existingByPhone.id,
+        doctor_name: existingByPhone.name
       })
     }
 
-    // ------------------------------------------------
-    // 2. FIND SPECIALTY
-    // ------------------------------------------------
+    // ---------------------------------------------
+    // CHECK DUPLICATE BY EMAIL
+    // ---------------------------------------------
 
-    const { data: specialties, error: specialtyError } =
-      await supabase
-        .from("specialties")
-        .select("id,name")
+    if (email) {
+
+      const normalizedEmail =
+        normalizeEmail(email)
+
+      const existingByEmail =
+        doctorsByPhone?.find(
+          doctor =>
+            doctor.email &&
+            normalizeEmail(doctor.email) ===
+            normalizedEmail
+        )
+
+      if (existingByEmail) {
+
+        return NextResponse.json({
+          success: false,
+          duplicate: true,
+          message: "Doctor with this email already exists",
+          doctor_id: existingByEmail.id,
+          doctor_name: existingByEmail.name
+        })
+      }
+    }
+
+    // ---------------------------------------------
+    // FIND SPECIALTY
+    // ---------------------------------------------
+
+    const {
+      data: specialties,
+      error: specialtyError
+    } = await supabase
+      .from("specialties")
+      .select("id,name")
 
     if (specialtyError) {
+
       console.log(specialtyError)
 
       return NextResponse.json(
@@ -130,37 +215,42 @@ export async function POST(request) {
       )
     }
 
-    const specialty = specialties?.find(
-      s =>
-        normalizeText(s.name) ===
-        normalizeText(specialtyName)
-    )
+    const specialty =
+      specialties?.find(
+        s =>
+          normalizeText(s.name) ===
+          normalizeText(specialtyName)
+      )
 
     if (!specialty) {
 
       return NextResponse.json(
         {
           success: false,
-          message: `Specialty not found: ${specialtyName}`
+          message:
+            `Specialty not found: ${specialtyName}`
         },
         { status: 400 }
       )
     }
 
-    // ------------------------------------------------
-    // 3. FIND STATE
-    // ------------------------------------------------
+    // ---------------------------------------------
+    // FIND STATE
+    // ---------------------------------------------
 
     let stateId = null
 
     if (stateName) {
 
-      const { data: states, error: stateError } =
-        await supabase
-          .from("states")
-          .select("id,name")
+      const {
+        data: states,
+        error: stateError
+      } = await supabase
+        .from("states")
+        .select("id,name")
 
       if (stateError) {
+
         console.log(stateError)
 
         return NextResponse.json(
@@ -172,18 +262,20 @@ export async function POST(request) {
         )
       }
 
-      const stateRecord = states?.find(
-        s =>
-          normalizeText(s.name) ===
-          normalizeText(stateName)
-      )
+      const stateRecord =
+        states?.find(
+          s =>
+            normalizeText(s.name) ===
+            normalizeText(stateName)
+        )
 
       if (!stateRecord) {
 
         return NextResponse.json(
           {
             success: false,
-            message: `State not found: ${stateName}`
+            message:
+              `State not found: ${stateName}`
           },
           { status: 400 }
         )
@@ -192,27 +284,32 @@ export async function POST(request) {
       stateId = stateRecord.id
     }
 
-    // ------------------------------------------------
-    // 4. FIND CITY
-    // ------------------------------------------------
+    // ---------------------------------------------
+    // FIND CITY
+    // ---------------------------------------------
 
     let cityId = null
 
     if (cityName) {
 
-      let cityQuery = supabase
-        .from("cities")
-        .select("id,name,state_id")
-        .ilike("name", cityName)
+      let cityQuery =
+        supabase
+          .from("cities")
+          .select("id,name,state_id")
+          .ilike("name", cityName)
 
       if (stateId) {
-        cityQuery = cityQuery.eq("state_id", stateId)
+        cityQuery =
+          cityQuery.eq("state_id", stateId)
       }
 
-      const { data: cities, error: cityError } =
-        await cityQuery
+      const {
+        data: cities,
+        error: cityError
+      } = await cityQuery
 
       if (cityError) {
+
         console.log(cityError)
 
         return NextResponse.json(
@@ -224,18 +321,20 @@ export async function POST(request) {
         )
       }
 
-      const cityRecord = cities?.find(
-        c =>
-          normalizeText(c.name) ===
-          normalizeText(cityName)
-      )
+      const cityRecord =
+        cities?.find(
+          c =>
+            normalizeText(c.name) ===
+            normalizeText(cityName)
+        )
 
       if (!cityRecord) {
 
         return NextResponse.json(
           {
             success: false,
-            message: `City not found: ${cityName}`
+            message:
+              `City not found: ${cityName}`
           },
           { status: 400 }
         )
@@ -244,37 +343,59 @@ export async function POST(request) {
       cityId = cityRecord.id
     }
 
-    // ------------------------------------------------
-    // 5. INSERT DOCTOR
-    // ------------------------------------------------
+    // ---------------------------------------------
+    // CREATE DOCTOR
+    // ---------------------------------------------
 
-    const { data: doctor, error: insertError } =
-      await supabase
-        .from("doctors")
-        .insert({
-          name,
-          qualification: qualification || null,
-          specialty_id: specialty.id,
-          experience_years: experience
+    const {
+      data: doctor,
+      error: insertError
+    } = await supabase
+      .from("doctors")
+      .insert({
+        name,
+        qualification:
+          qualification || null,
+
+        specialty_id:
+          specialty.id,
+
+        experience_years:
+          experience
             ? Number(experience)
             : null,
-          phone: phone || null,
-          email: email || null,
-          state_id: stateId,
-          city_id: cityId,
-          preferred_location:
-            preferredLocation || null,
-          expected_ctc:
-            expectedCTC
-              ? Number(expectedCTC)
-              : null,
-          availability_status:
-            availability || "available",
-          remarks: remarks || null,
-          source: "Google Form"
-        })
-        .select()
-        .single()
+
+        phone:
+          phone || null,
+
+        email:
+          email || null,
+
+        state_id:
+          stateId,
+
+        city_id:
+          cityId,
+
+        preferred_location:
+          preferredLocation || null,
+
+        expected_ctc:
+          expectedCTC
+            ? Number(expectedCTC)
+            : null,
+
+        availability_status:
+          availability,
+
+        remarks:
+          remarks || null,
+
+        source:
+          "Google Form"
+      })
+      .select()
+      .single()
 
     if (insertError) {
 
@@ -290,9 +411,9 @@ export async function POST(request) {
       )
     }
 
-    // ------------------------------------------------
-    // 6. SUCCESS
-    // ------------------------------------------------
+    // ---------------------------------------------
+    // SUCCESS
+    // ---------------------------------------------
 
     return NextResponse.json({
       success: true,
