@@ -2,9 +2,9 @@ import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
 
-// ---------------------------------------------
+// =============================================
 // SUPABASE
-// ---------------------------------------------
+// =============================================
 
 const supabase =
   createClient(
@@ -13,9 +13,9 @@ const supabase =
   )
 
 
-// ---------------------------------------------
+// =============================================
 // HELPERS
-// ---------------------------------------------
+// =============================================
 
 function clean(value) {
 
@@ -52,44 +52,14 @@ function normalizeEmail(value) {
 }
 
 
-// ---------------------------------------------
+// =============================================
 // POST
-// ---------------------------------------------
+// =============================================
 
 export async function POST(request) {
 
   try {
-// =============================================
-// SECURITY
-// =============================================
 
-const body =
-  await request.json()
-
-const secret =
-  clean(body.google_form_secret)
-
-const configuredSecret =
-  process.env.GOOGLE_FORM_SECRET
-
-
-if (
-  !secret ||
-  !configuredSecret ||
-  secret !== configuredSecret
-) {
-
-  return NextResponse.json(
-    {
-      success: false,
-      message: "Unauthorized"
-    },
-    {
-      status: 401
-    }
-  )
-
-}
     // =============================================
     // READ REQUEST BODY
     // =============================================
@@ -97,6 +67,42 @@ if (
     const body =
       await request.json()
 
+
+    // =============================================
+    // SECURITY
+    // =============================================
+
+    const secret =
+      clean(
+        body.google_form_secret
+      )
+
+    const configuredSecret =
+      process.env.GOOGLE_FORM_SECRET
+
+
+    if (
+      !secret ||
+      !configuredSecret ||
+      secret !== configuredSecret
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized"
+        },
+        {
+          status: 401
+        }
+      )
+
+    }
+
+
+    // =============================================
+    // READ DOCTOR DATA
+    // =============================================
 
     const name =
       clean(body.name)
@@ -729,6 +735,10 @@ if (
         .select()
         .single()
 
+
+    // =============================================
+    // INSERT ERROR
+    // =============================================
 
     if (insertError) {
 
