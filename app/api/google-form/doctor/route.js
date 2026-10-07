@@ -59,38 +59,53 @@ function normalizeEmail(value) {
 export async function POST(request) {
 
   try {
+// =============================================
+// SECURITY DEBUG
+// =============================================
 
-    // =============================================
-    // SECURITY
-    // =============================================
+const secret =
+  request.headers.get("x-google-form-secret")
 
-    const secret =
-      request.headers.get(
-        "x-google-form-secret"
-      )
+const configuredSecret =
+  process.env.GOOGLE_FORM_SECRET
 
-    const configuredSecret =
-      process.env.GOOGLE_FORM_SECRET
+console.log(
+  "GOOGLE FORM AUTH DEBUG",
+  {
+    received: !!secret,
+    receivedLength: secret
+      ? secret.length
+      : 0,
 
+    configured: !!configuredSecret,
+    configuredLength: configuredSecret
+      ? configuredSecret.length
+      : 0,
 
-    if (
-      !secret ||
-      !configuredSecret ||
-      secret !== configuredSecret
-    ) {
+    matches:
+      !!secret &&
+      !!configuredSecret &&
+      secret === configuredSecret
+  }
+)
 
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Unauthorized"
-        },
-        {
-          status: 401
-        }
-      )
+if (
+  !secret ||
+  !configuredSecret ||
+  secret !== configuredSecret
+) {
 
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Unauthorized"
+    },
+    {
+      status: 401
     }
+  )
 
+}
 
     // =============================================
     // READ REQUEST BODY
