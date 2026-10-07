@@ -27,14 +27,11 @@ function clean(value) {
   }
 
   return String(value).trim()
-
 }
 
 
 function normalizeText(value) {
-
   return clean(value).toLowerCase()
-
 }
 
 
@@ -168,17 +165,14 @@ export async function POST(request) {
     // VALIDATION
     // =============================================
 
-    if (
-      !existingHospital
-    ) {
+    if (!existingHospital) {
 
       if (!hospitalName) {
 
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Hospital name is required"
+            message: "Hospital name is required"
           },
           {
             status: 400
@@ -193,8 +187,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Contact person is required"
+            message: "Contact person is required"
           },
           {
             status: 400
@@ -209,8 +202,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Phone is required"
+            message: "Phone is required"
           },
           {
             status: 400
@@ -225,8 +217,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "State is required"
+            message: "State is required"
           },
           {
             status: 400
@@ -241,8 +232,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "City is required"
+            message: "City is required"
           },
           {
             status: 400
@@ -259,8 +249,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Specialty is required"
+          message: "Specialty is required"
         },
         {
           status: 400
@@ -275,8 +264,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Number of positions is required"
+          message: "Number of positions is required"
         },
         {
           status: 400
@@ -292,10 +280,7 @@ export async function POST(request) {
 
     let experienceValue = null
 
-
-    if (
-      experienceRequired
-    ) {
+    if (experienceRequired) {
 
       const parsedExperience =
         Number(
@@ -304,17 +289,14 @@ export async function POST(request) {
 
 
       if (
-        Number.isNaN(
-          parsedExperience
-        ) ||
+        Number.isNaN(parsedExperience) ||
         parsedExperience < 0
       ) {
 
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Experience must be a valid number"
+            message: "Experience must be a valid number"
           },
           {
             status: 400
@@ -336,7 +318,6 @@ export async function POST(request) {
 
     let salaryMinValue = null
 
-
     if (salaryMin) {
 
       const parsedSalaryMin =
@@ -349,17 +330,14 @@ export async function POST(request) {
 
 
       if (
-        Number.isNaN(
-          parsedSalaryMin
-        ) ||
+        Number.isNaN(parsedSalaryMin) ||
         parsedSalaryMin < 0
       ) {
 
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Minimum salary must be a valid number"
+            message: "Minimum salary must be a valid number"
           },
           {
             status: 400
@@ -381,7 +359,6 @@ export async function POST(request) {
 
     let salaryMaxValue = null
 
-
     if (salaryMax) {
 
       const parsedSalaryMax =
@@ -394,17 +371,14 @@ export async function POST(request) {
 
 
       if (
-        Number.isNaN(
-          parsedSalaryMax
-        ) ||
+        Number.isNaN(parsedSalaryMax) ||
         parsedSalaryMax < 0
       ) {
 
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Maximum salary must be a valid number"
+            message: "Maximum salary must be a valid number"
           },
           {
             status: 400
@@ -431,9 +405,7 @@ export async function POST(request) {
 
 
     if (
-      Number.isNaN(
-        positions
-      ) ||
+      Number.isNaN(positions) ||
       positions <= 0
     ) {
 
@@ -461,9 +433,7 @@ export async function POST(request) {
     } =
       await supabase
         .from("specialties")
-        .select(
-          "id,name"
-        )
+        .select("id,name")
 
 
     if (specialtyError) {
@@ -477,8 +447,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Unable to load specialties"
+          message: "Unable to load specialties"
         },
         {
           status: 500
@@ -491,12 +460,8 @@ export async function POST(request) {
     const specialty =
       specialties?.find(
         item =>
-          normalizeText(
-            item.name
-          ) ===
-          normalizeText(
-            specialtyName
-          )
+          normalizeText(item.name) ===
+          normalizeText(specialtyName)
       )
 
 
@@ -523,9 +488,7 @@ export async function POST(request) {
     let hospital = null
 
 
-    if (
-      existingHospital
-    ) {
+    if (existingHospital) {
 
       const hospitalId =
         Number(
@@ -533,17 +496,12 @@ export async function POST(request) {
         )
 
 
-      if (
-        Number.isNaN(
-          hospitalId
-        )
-      ) {
+      if (Number.isNaN(hospitalId)) {
 
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Invalid hospital ID"
+            message: "Invalid hospital ID"
           },
           {
             status: 400
@@ -620,9 +578,7 @@ export async function POST(request) {
     // NEW HOSPITAL
     // =============================================
 
-    if (
-      !existingHospital
-    ) {
+    if (!existingHospital) {
 
       // -------------------------------------------
       // FIND STATE
@@ -634,9 +590,7 @@ export async function POST(request) {
       } =
         await supabase
           .from("states")
-          .select(
-            "id,name"
-          )
+          .select("id,name")
 
 
       if (stateError) {
@@ -650,8 +604,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Unable to load states"
+            message: "Unable to load states"
           },
           {
             status: 500
@@ -664,12 +617,8 @@ export async function POST(request) {
       const stateRecord =
         states?.find(
           item =>
-            normalizeText(
-              item.name
-            ) ===
-            normalizeText(
-              stateName
-            )
+            normalizeText(item.name) ===
+            normalizeText(stateName)
         )
 
 
@@ -690,7 +639,7 @@ export async function POST(request) {
 
 
       // -------------------------------------------
-      // FIND CITY
+      // FIND OR CREATE CITY
       // -------------------------------------------
 
       const {
@@ -719,8 +668,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             success: false,
-            message:
-              "Unable to load cities"
+            message: "Unable to load cities"
           },
           {
             status: 500
@@ -730,30 +678,68 @@ export async function POST(request) {
       }
 
 
-      const cityRecord =
+      let cityRecord =
         cities?.find(
           item =>
-            normalizeText(
-              item.name
-            ) ===
-            normalizeText(
-              cityName
-            )
+            normalizeText(item.name) ===
+            normalizeText(cityName)
         )
 
+
+      // -------------------------------------------
+      // CREATE CITY IF IT DOES NOT EXIST
+      // -------------------------------------------
 
       if (!cityRecord) {
 
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              `City not found: ${cityName}`
-          },
-          {
-            status: 400
-          }
+        console.log(
+          "City not found. Creating:",
+          cityName
         )
+
+
+        const {
+          data: newCity,
+          error: cityInsertError
+        } =
+          await supabase
+            .from("cities")
+            .insert({
+              name: cityName,
+              state_id: stateRecord.id
+            })
+            .select(
+              "id,name,state_id"
+            )
+            .single()
+
+
+        if (cityInsertError) {
+
+          console.log(
+            "City creation error:",
+            cityInsertError
+          )
+
+
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                `Unable to create city: ${cityName}`,
+              error:
+                cityInsertError.message
+            },
+            {
+              status: 500
+            }
+          )
+
+        }
+
+
+        cityRecord =
+          newCity
 
       }
 
@@ -798,24 +784,14 @@ export async function POST(request) {
       const duplicateHospital =
         existingHospitals?.find(
           item =>
-            normalizeText(
-              item.hospital_name
-            ) ===
-            normalizeText(
-              hospitalName
-            ) &&
-            normalizeText(
-              item.city
-            ) ===
-            normalizeText(
-              cityRecord.name
-            )
+            normalizeText(item.hospital_name) ===
+              normalizeText(hospitalName) &&
+            normalizeText(item.city) ===
+              normalizeText(cityRecord.name)
         )
 
 
-      if (
-        duplicateHospital
-      ) {
+      if (duplicateHospital) {
 
         return NextResponse.json(
           {
@@ -871,7 +847,9 @@ export async function POST(request) {
 
             status:
               "active",
-            source: "google_form"
+
+            source:
+              "google_form"
 
           })
           .select()
@@ -956,8 +934,11 @@ export async function POST(request) {
           state:
             hospital.state || null,
 
-     entry_date: today,
-      source: "google_form"
+          entry_date:
+            today,
+
+          source:
+            "google_form"
 
         })
         .select()
