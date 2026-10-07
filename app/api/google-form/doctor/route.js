@@ -1,57 +1,104 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+
+// ---------------------------------------------
+// SUPABASE
+// ---------------------------------------------
+
+const supabase =
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+
+// ---------------------------------------------
+// HELPERS
+// ---------------------------------------------
 
 function clean(value) {
-  if (value === undefined || value === null) return ""
+
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return ""
+  }
+
   return String(value).trim()
+
 }
+
 
 function normalizeText(value) {
+
   return clean(value).toLowerCase()
+
 }
+
 
 function normalizePhone(value) {
+
   return clean(value).replace(/\D/g, "")
+
 }
 
+
 function normalizeEmail(value) {
+
   return clean(value).toLowerCase()
+
 }
+
+
+// ---------------------------------------------
+// POST
+// ---------------------------------------------
 
 export async function POST(request) {
 
   try {
 
-    // ---------------------------------------------
+    // =============================================
     // SECURITY
-    // ---------------------------------------------
+    // =============================================
 
     const secret =
-      request.headers.get("GOOGLE_FORM_SECRET_KISHORE")
+      request.headers.get(
+        "x-google-form-secret"
+      )
+
+    const configuredSecret =
+      process.env.GOOGLE_FORM_SECRET
+
 
     if (
       !secret ||
-      secret !== process.env.GOOGLE_FORM_SECRET
+      !configuredSecret ||
+      secret !== configuredSecret
     ) {
+
       return NextResponse.json(
         {
           success: false,
           message: "Unauthorized"
         },
-        { status: 401 }
+        {
+          status: 401
+        }
       )
+
     }
 
-    // ---------------------------------------------
-    // READ DATA
-    // ---------------------------------------------
 
-    const body = await request.json()
+    // =============================================
+    // READ REQUEST BODY
+    // =============================================
+
+    const body =
+      await request.json()
+
 
     const name =
       clean(body.name)
@@ -90,76 +137,102 @@ export async function POST(request) {
       clean(body.remarks)
 
 
-    // ---------------------------------------------
+    // =============================================
     // VALIDATION
-    // ---------------------------------------------
+    // =============================================
 
     if (!name) {
+
       return NextResponse.json(
         {
           success: false,
-          message: "Doctor name is required"
+          message:
+            "Doctor name is required"
         },
-        { status: 400 }
+        {
+          status: 400
+        }
       )
+
     }
+
 
     if (!specialtyName) {
+
       return NextResponse.json(
         {
           success: false,
-          message: "Specialty is required"
+          message:
+            "Specialty is required"
         },
-        { status: 400 }
+        {
+          status: 400
+        }
       )
+
     }
+
 
     if (!phone) {
+
       return NextResponse.json(
         {
           success: false,
-          message: "Phone is required"
+          message:
+            "Phone is required"
         },
-        { status: 400 }
+        {
+          status: 400
+        }
       )
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // EXPERIENCE
-    // ---------------------------------------------
+    // =============================================
 
     let experienceYears = null
+
 
     if (experience) {
 
       const parsedExperience =
         Number(experience)
 
+
       if (
         Number.isNaN(parsedExperience) ||
         parsedExperience < 0
       ) {
+
         return NextResponse.json(
           {
             success: false,
             message:
               "Experience must be a valid number"
           },
-          { status: 400 }
+          {
+            status: 400
+          }
         )
+
       }
+
 
       experienceYears =
         parsedExperience
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // EXPECTED CTC
-    // ---------------------------------------------
+    // =============================================
 
     let expectedCtcValue = null
+
 
     if (expectedCTC) {
 
@@ -171,71 +244,95 @@ export async function POST(request) {
             .trim()
         )
 
+
       if (
         Number.isNaN(parsedCtc) ||
         parsedCtc < 0
       ) {
+
         return NextResponse.json(
           {
             success: false,
             message:
               "Expected CTC must be a valid number"
           },
-          { status: 400 }
+          {
+            status: 400
+          }
         )
+
       }
+
 
       expectedCtcValue =
         parsedCtc
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // AVAILABILITY
-    // ---------------------------------------------
+    // =============================================
 
     let availability =
       "available"
 
+
     const availabilityText =
-      normalizeText(availabilityInput)
+      normalizeText(
+        availabilityInput
+      )
+
 
     if (
       availabilityText ===
       "not available"
     ) {
+
       availability =
         "not_available"
+
     }
+
 
     if (
       availabilityText ===
       "in process"
     ) {
+
       availability =
         "in_process"
+
     }
 
 
-    // ---------------------------------------------
-    // DUPLICATE CHECK - PHONE
-    // ---------------------------------------------
+    // =============================================
+    // DUPLICATE CHECK
+    // PHONE
+    // =============================================
 
     const normalizedPhone =
       normalizePhone(phone)
 
+
     const {
-      data: doctorsByPhone,
-      error: phoneError
-    } = await supabase
-      .from("doctors")
-      .select(
-        "id,name,phone,email"
+      data: doctors,
+      error: doctorsError
+    } =
+      await supabase
+        .from("doctors")
+        .select(
+          "id,name,phone,email"
+        )
+
+
+    if (doctorsError) {
+
+      console.log(
+        "Doctor lookup error:",
+        doctorsError
       )
 
-    if (phoneError) {
-
-      console.log(phoneError)
 
       return NextResponse.json(
         {
@@ -243,12 +340,16 @@ export async function POST(request) {
           message:
             "Unable to check existing doctors"
         },
-        { status: 500 }
+        {
+          status: 500
+        }
       )
+
     }
 
+
     const existingByPhone =
-      doctorsByPhone?.find(
+      doctors?.find(
         doctor =>
           doctor.phone &&
           normalizePhone(
@@ -256,32 +357,38 @@ export async function POST(request) {
           ) === normalizedPhone
       )
 
+
     if (existingByPhone) {
 
-      return NextResponse.json({
-        success: false,
-        duplicate: true,
-        message:
-          "Doctor with this phone number already exists",
-        doctor_id:
-          existingByPhone.id,
-        doctor_name:
-          existingByPhone.name
-      })
+      return NextResponse.json(
+        {
+          success: false,
+          duplicate: true,
+          message:
+            "Doctor with this phone number already exists",
+          doctor_id:
+            existingByPhone.id,
+          doctor_name:
+            existingByPhone.name
+        }
+      )
+
     }
 
 
-    // ---------------------------------------------
-    // DUPLICATE CHECK - EMAIL
-    // ---------------------------------------------
+    // =============================================
+    // DUPLICATE CHECK
+    // EMAIL
+    // =============================================
 
     if (email) {
 
       const normalizedEmail =
         normalizeEmail(email)
 
+
       const existingByEmail =
-        doctorsByPhone?.find(
+        doctors?.find(
           doctor =>
             doctor.email &&
             normalizeEmail(
@@ -289,36 +396,49 @@ export async function POST(request) {
             ) === normalizedEmail
         )
 
+
       if (existingByEmail) {
 
-        return NextResponse.json({
-          success: false,
-          duplicate: true,
-          message:
-            "Doctor with this email already exists",
-          doctor_id:
-            existingByEmail.id,
-          doctor_name:
-            existingByEmail.name
-        })
+        return NextResponse.json(
+          {
+            success: false,
+            duplicate: true,
+            message:
+              "Doctor with this email already exists",
+            doctor_id:
+              existingByEmail.id,
+            doctor_name:
+              existingByEmail.name
+          }
+        )
+
       }
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // FIND SPECIALTY
-    // ---------------------------------------------
+    // =============================================
 
     const {
       data: specialties,
       error: specialtyError
-    } = await supabase
-      .from("specialties")
-      .select("id,name")
+    } =
+      await supabase
+        .from("specialties")
+        .select(
+          "id,name"
+        )
+
 
     if (specialtyError) {
 
-      console.log(specialtyError)
+      console.log(
+        "Specialty lookup error:",
+        specialtyError
+      )
+
 
       return NextResponse.json(
         {
@@ -326,16 +446,25 @@ export async function POST(request) {
           message:
             "Unable to load specialties"
         },
-        { status: 500 }
+        {
+          status: 500
+        }
       )
+
     }
+
 
     const specialty =
       specialties?.find(
         item =>
-          normalizeText(item.name) ===
-          normalizeText(specialtyName)
+          normalizeText(
+            item.name
+          ) ===
+          normalizeText(
+            specialtyName
+          )
       )
+
 
     if (!specialty) {
 
@@ -345,30 +474,42 @@ export async function POST(request) {
           message:
             `Specialty not found: ${specialtyName}`
         },
-        { status: 400 }
+        {
+          status: 400
+        }
       )
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // FIND STATE
-    // ---------------------------------------------
+    // =============================================
 
     let stateId = null
     let stateValue = null
+
 
     if (stateName) {
 
       const {
         data: states,
         error: stateError
-      } = await supabase
-        .from("states")
-        .select("id,name")
+      } =
+        await supabase
+          .from("states")
+          .select(
+            "id,name"
+          )
 
-    if (stateError) {
 
-        console.log(stateError)
+      if (stateError) {
+
+        console.log(
+          "State lookup error:",
+          stateError
+        )
+
 
         return NextResponse.json(
           {
@@ -376,16 +517,25 @@ export async function POST(request) {
             message:
               "Unable to load states"
           },
-          { status: 500 }
+          {
+            status: 500
+          }
         )
+
       }
+
 
       const stateRecord =
         states?.find(
           item =>
-            normalizeText(item.name) ===
-            normalizeText(stateName)
+            normalizeText(
+              item.name
+            ) ===
+            normalizeText(
+              stateName
+            )
         )
+
 
       if (!stateRecord) {
 
@@ -395,24 +545,30 @@ export async function POST(request) {
             message:
               `State not found: ${stateName}`
           },
-          { status: 400 }
+          {
+            status: 400
+          }
         )
+
       }
+
 
       stateId =
         stateRecord.id
 
       stateValue =
         stateRecord.name
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // FIND CITY
-    // ---------------------------------------------
+    // =============================================
 
     let cityId = null
     let cityValue = null
+
 
     if (cityName) {
 
@@ -427,22 +583,32 @@ export async function POST(request) {
             cityName
           )
 
+
       if (stateId) {
+
         cityQuery =
           cityQuery.eq(
             "state_id",
             stateId
           )
+
       }
+
 
       const {
         data: cities,
         error: cityError
-      } = await cityQuery
+      } =
+        await cityQuery
+
 
       if (cityError) {
 
-        console.log(cityError)
+        console.log(
+          "City lookup error:",
+          cityError
+        )
+
 
         return NextResponse.json(
           {
@@ -450,16 +616,25 @@ export async function POST(request) {
             message:
               "Unable to load cities"
           },
-          { status: 500 }
+          {
+            status: 500
+          }
         )
+
       }
+
 
       const cityRecord =
         cities?.find(
           item =>
-            normalizeText(item.name) ===
-            normalizeText(cityName)
+            normalizeText(
+              item.name
+            ) ===
+            normalizeText(
+              cityName
+            )
         )
+
 
       if (!cityRecord) {
 
@@ -469,86 +644,92 @@ export async function POST(request) {
             message:
               `City not found: ${cityName}`
           },
-          { status: 400 }
+          {
+            status: 400
+          }
         )
+
       }
+
 
       cityId =
         cityRecord.id
 
       cityValue =
         cityRecord.name
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // CREATE DOCTOR
-    // ---------------------------------------------
+    // =============================================
 
     const {
       data: doctor,
       error: insertError
-    } = await supabase
-      .from("doctors")
-      .insert({
+    } =
+      await supabase
+        .from("doctors")
+        .insert({
 
-        name:
-          name,
+          name:
+            name,
 
-        qualification:
-          qualification || null,
+          qualification:
+            qualification || null,
 
-        specialty_id:
-          specialty.id,
+          specialty_id:
+            specialty.id,
 
-        specialty:
-          specialty.name,
+          specialty:
+            specialty.name,
 
-        experience_years:
-          experienceYears,
+          experience_years:
+            experienceYears,
 
-        current_location:
-          null,
+          current_location:
+            null,
 
-        preferred_location:
-          preferredLocation || null,
+          preferred_location:
+            preferredLocation || null,
 
-        expected_ctc:
-          expectedCtcValue,
+          expected_ctc:
+            expectedCtcValue,
 
-        phone:
-          phone || null,
+          phone:
+            phone || null,
 
-        email:
-          email || null,
+          email:
+            email || null,
 
-        availability_status:
-          availability,
+          availability_status:
+            availability,
 
-        state_id:
-          stateId,
+          state_id:
+            stateId,
 
-        state:
-          stateValue,
+          state:
+            stateValue,
 
-        district_id:
-          null,
+          district_id:
+            null,
 
-        city_id:
-          cityId,
+          city_id:
+            cityId,
 
-        city:
-          cityValue,
+          city:
+            cityValue,
 
-        source:
-          "Google Form",
+          source:
+            "Google Form",
 
-        remarks:
-          remarks || null
+          remarks:
+            remarks || null
 
-      })
-      .select()
-      .single()
+        })
+        .select()
+        .single()
 
 
     if (insertError) {
@@ -558,6 +739,7 @@ export async function POST(request) {
         insertError
       )
 
+
       return NextResponse.json(
         {
           success: false,
@@ -566,14 +748,17 @@ export async function POST(request) {
           error:
             insertError.message
         },
-        { status: 500 }
+        {
+          status: 500
+        }
       )
+
     }
 
 
-    // ---------------------------------------------
+    // =============================================
     // SUCCESS
-    // ---------------------------------------------
+    // =============================================
 
     return NextResponse.json({
 
@@ -599,13 +784,20 @@ export async function POST(request) {
       error
     )
 
+
     return NextResponse.json(
       {
         success: false,
         message:
-          "Invalid request"
+          "Invalid request",
+        error:
+          error?.message || null
       },
-      { status: 500 }
+      {
+        status: 500
+      }
     )
+
   }
+
 }
