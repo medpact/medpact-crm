@@ -56,6 +56,7 @@ specialty_id,
 hospital_id,
 city,
 state,
+source,
 hospitals(
   hospital_name,
   cities(name)
@@ -86,11 +87,10 @@ const finalData = data.map(r=>({
 match_count: countMap[r.specialty_id] || 0
 }))
 
-
-
 setRequirements(finalData)
 
 }
+
 
 /* GROUP */
 
@@ -134,7 +134,7 @@ page*pageSize
 async function deleteRequirementGroup(reqs){
 
 if(currentUser !== "nagireddy"){
-  console.log("Logged user:", currentUser) // DEBUG
+console.log("Logged user:", currentUser)
 alert("Only Mr. Nagireddy can delete the requirement")
 return
 }
@@ -157,6 +157,8 @@ alert("Deleted successfully")
 loadRequirements()
 
 }
+
+
 async function deleteSingleRequirement(id){
 
 if(currentUser !== "nagireddy"){
@@ -255,6 +257,9 @@ overflow:"hidden"
 const reqs = grouped[hospital]
 const latestDate = reqs[0]?.entry_date
 
+const hasGoogleFormRequirement =
+reqs.some(r => r.source === "google_form")
+
 return(
 
 <>
@@ -269,11 +274,39 @@ onClick={()=>setExpanded(expanded===hospital ? null : hospital)}
 >
 
 <td>{formatDate(latestDate)}</td>
-<td>{hospital}</td>
+
+<td>
+
+{hospital}
+
+{hasGoogleFormRequirement && (
+<span
+title="Submitted through Google Form"
+style={{
+display:"inline-block",
+marginLeft:"6px",
+fontSize:"9px",
+fontWeight:"700",
+color:"#2563eb",
+background:"#dbeafe",
+padding:"2px 4px",
+borderRadius:"3px",
+verticalAlign:"super",
+lineHeight:"1"
+}}
+>
+FORM
+</span>
+)}
+
+</td>
+
 <td>
 {reqs[0].city || reqs[0].hospitals?.cities?.name || "-"}
 </td>
+
 <td>{reqs.length}</td>
+
 <td>{expanded===hospital ? "▲" : "▼"}</td>
 
 <td
@@ -311,10 +344,37 @@ style={{cursor:"pointer", color:"red"}}
 {reqs.map((r)=>(
 
 <tr key={r.id}>
-<td style={{paddingLeft:"40px"}}>{r.specialties?.name}</td>
+
+<td style={{paddingLeft:"40px"}}>
+
+{r.specialties?.name}
+
+{r.source === "google_form" && (
+<span
+title="Submitted through Google Form"
+style={{
+display:"inline-block",
+marginLeft:"6px",
+fontSize:"8px",
+fontWeight:"700",
+color:"#2563eb",
+background:"#dbeafe",
+padding:"2px 4px",
+borderRadius:"3px",
+verticalAlign:"super",
+lineHeight:"1"
+}}
+>
+FORM
+</span>
+)}
+
+</td>
+
 <td>
 {r.city || r.hospitals?.cities?.name || "-"}
 </td>
+
 <td>{r.positions}</td>
 
 <td>
