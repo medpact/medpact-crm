@@ -28,6 +28,7 @@ contact_designation,
 phone,
 email,
 status,
+source,
 cities(name),
 states(name)
 `)
@@ -50,6 +51,7 @@ if(status==="inactive") return "#ef4444"
 return "#64748b"
 
 }
+
 const filteredHospitals = hospitals.filter((h) => {
   const term = search.toLowerCase()
 
@@ -62,7 +64,6 @@ const filteredHospitals = hospitals.filter((h) => {
     (h.states?.name || "").toLowerCase().includes(term)
   )
 })
-/* PAGINATION */
 
 const totalPages = Math.ceil(filteredHospitals.length / pageSize)
 
@@ -96,6 +97,7 @@ borderRadius:"6px"
 </Link>
 
 </div>
+
 <input
   placeholder="Search hospital, city, state, contact..."
   value={search}
@@ -111,6 +113,7 @@ borderRadius:"6px"
     borderRadius:"6px"
   }}
 />
+
 <div style={{
 background:"#fff",
 border:"1px solid #e5e7eb",
@@ -142,7 +145,31 @@ overflow:"hidden"
 
 <tr key={h.id}>
 
-<td>{h.hospital_name}</td>
+<td>
+{h.hospital_name}
+
+{h.source === "google_form" && (
+<span
+title="Submitted through Google Form"
+style={{
+display:"inline-block",
+marginLeft:"6px",
+fontSize:"9px",
+fontWeight:"700",
+color:"#2563eb",
+background:"#dbeafe",
+padding:"2px 4px",
+borderRadius:"3px",
+verticalAlign:"super",
+lineHeight:"1"
+}}
+>
+FORM
+</span>
+)}
+
+</td>
+
 <td>{h.hospital_type}</td>
 <td>{h.cities?.name}</td>
 <td>{h.states?.name}</td>
@@ -176,9 +203,11 @@ fontSize:"12px"
 
 </div>
 
-{/* PAGINATION */}
-
-<div style={{marginTop:"20px",display:"flex",gap:"8px"}}>
+<div style={{
+marginTop:"20px",
+display:"flex",
+gap:"8px"
+}}>
 
 {Array.from({length:totalPages}).map((_,i)=>{
 
