@@ -49,9 +49,8 @@ export default function HospitalsDirectoryPage() {
     return [...result].sort((a, b) => sort === "name" ? a.name.localeCompare(b.name) : Number(b.featured) - Number(a.featured) || Number(b.verified) - Number(a.verified) || a.name.localeCompare(b.name))
   }, [hospitals, query, city, type, sort])
 
-  return (
-  <main className={`${displayFont.variable} ${bodyFont.variable} page`}>
-    <style jsx global>{styles}</style>
+  
+  return <main className={`${displayFont.variable} ${bodyFont.variable} page`}><style jsx global>{styles}</style>
     <header className="nav"><Link href="/medicalneeds" className="brand"><span className="brandMark">M</span><span>Medpact <b>Care</b></span></Link><nav><Link href="/medicalneeds">Medical Needs</Link><Link href="/medicalneeds/doctors">Doctors</Link><a href="#directory">Hospitals</a><Link href="/medicalneeds#cost-guide">Cost Guide</Link></nav><Link href="/medicalneeds#review" className="navCta">Medical Review <span>↗</span></Link></header>
     <section className="hero"><div className="eyebrow">HOSPITAL DIRECTORY</div><h1>Find a hospital that fits your <em>care journey.</em></h1><p>Explore published hospital profiles by city, specialty, procedures and international-patient services. Hospital information is added and verified by the Medpact team.</p><div className="searchBox"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search hospital, city, specialty or procedure…" /></div></section>
     <section className="directory" id="directory"><div className="toolbar"><div className="filters"><select value={city} onChange={e => setCity(e.target.value)}>{cities.map(x => <option key={x}>{x}</option>)}</select><select value={type} onChange={e => setType(e.target.value)}>{types.map(x => <option key={x}>{x}</option>)}</select></div><select value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Recommended</option><option value="name">Name A–Z</option></select></div>
