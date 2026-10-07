@@ -10,14 +10,22 @@ const bodyFont = Public_Sans({ subsets: ["latin"], variable: "--font-body" })
 function getClient() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) }
 
 export async function generateMetadata({ params }) {
-  const { data } = await getClient().from("medical_hospitals").select("name,city,state,description").eq("slug", params.slug).eq("is_published", true).maybeSingle()
+  const { slug } = await params
+
+  const { data } = await getClient()
+    .from("medical_hospitals")
+    .select("name,city,state,description")
+    .eq("slug", slug)
+    .eq("is_published", true)
+    .maybeSingle()
   if (!data) return { title: "Hospital | Medpact Care" }
   return { title: `${data.name} | Medpact Care`, description: data.description || `Hospital profile for ${data.name}${data.city ? ` in ${data.city}` : ""}.` }
 }
 
 export default async function HospitalProfilePage({ params }) {
+  const { slug } = await params
   const supabase = getClient()
-  const { data: h, error } = await supabase.from("medical_hospitals").select("*").eq("slug", params.slug).eq("is_published", true).maybeSingle()
+  const { data: h, error } = await supabase.from("medical_hospitals").select("*").eq("slug", slug).eq("is_published", true).maybeSingle()
   if (error || !h) notFound()
   const { data: links } = await supabase.from("medical_doctor_hospitals").select("doctor:medical_doctors(id,slug,full_name,title,specialty,sub_specialty,experience_years,profile_photo,verified,is_published)").eq("hospital_id", h.id)
   const doctors = (links || []).map(x => x.doctor).filter(Boolean).filter(d => d.is_published)
