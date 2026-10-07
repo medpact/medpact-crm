@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { getSupabaseBrowserClient } from "../../../../../lib/supabase-browser"
+import { getSupabaseBrowserClient } from "../../../../lib/supabase-browser"
 
 const empty={name:"",slug:"",city:"",state:"",hospital_type:"",accreditations:"",key_specialties:"",key_procedures:"",international_patient_services:"",address:"",website:"",airport_information:"",description:"",featured:false,verified:false,is_published:false,images:[]}
 function toSlug(v){return String(v||"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")}
