@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Newsreader, Public_Sans } from "next/font/google"
-import { getSupabaseBrowserClient } from "../../../../lib/supabase-browser"
+import { getSupabaseBrowserClient } from "../../../lib/supabase-browser"
 
 const displayFont = Newsreader({ subsets: ["latin"], variable: "--font-display" })
 const bodyFont = Public_Sans({ subsets: ["latin"], variable: "--font-body" })
