@@ -870,7 +870,8 @@ export async function POST(request) {
               cityRecord.id,
 
             status:
-              "active"
+              "active",
+            source: "google_form"
 
           })
           .select()
@@ -955,8 +956,8 @@ export async function POST(request) {
           state:
             hospital.state || null,
 
-          entry_date:
-            today
+     entry_date: today,
+      source: "google_form"
 
         })
         .select()
