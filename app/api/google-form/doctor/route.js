@@ -60,34 +60,18 @@ export async function POST(request) {
 
   try {
 // =============================================
-// SECURITY DEBUG
+// SECURITY
 // =============================================
 
+const body =
+  await request.json()
+
 const secret =
-  request.headers.get("x-google-form-secret")
+  clean(body.google_form_secret)
 
 const configuredSecret =
   process.env.GOOGLE_FORM_SECRET
 
-console.log(
-  "GOOGLE FORM AUTH DEBUG",
-  {
-    received: !!secret,
-    receivedLength: secret
-      ? secret.length
-      : 0,
-
-    configured: !!configuredSecret,
-    configuredLength: configuredSecret
-      ? configuredSecret.length
-      : 0,
-
-    matches:
-      !!secret &&
-      !!configuredSecret &&
-      secret === configuredSecret
-  }
-)
 
 if (
   !secret ||
@@ -104,6 +88,7 @@ if (
       status: 401
     }
   )
+
 }
     // =============================================
     // READ REQUEST BODY
