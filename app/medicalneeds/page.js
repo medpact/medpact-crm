@@ -1,8 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Newsreader, Public_Sans } from "next/font/google"
-import { procedures, procedureCategories } from "../../data/procedures"
+import { getSupabaseBrowserClient } from "../../lib/supabase-browser"
 
 const displayFont = Newsreader({
   subsets: ["latin"],
@@ -34,46 +35,128 @@ const discoveryItems = [
   {
     icon: "03",
     title: "Treatments",
-    text: "Understand procedures, recovery and treatment pathways.",
-    href: "#treatments",
+    text: "Explore procedures, recovery and indicative India costs.",
+    href: "/medicalneeds/treatments",
   },
   {
     icon: "04",
     title: "Cost Guide",
-    text: "Compare indicative treatment costs before you travel.",
+    text: "Understand indicative treatment costs before you travel.",
     href: "#cost-guide",
   },
 ]
 
 const journeySteps = [
-  ["01", "Tell us what you need", "Start with a treatment, condition, procedure or medical question."],
-  ["02", "Share your medical records", "Provide reports, scans and relevant treatment history for review."],
-  ["03", "Specialist & hospital matching", "We help identify appropriate specialists and hospital options."],
-  ["04", "Compare your options", "Understand treatment pathways, indicative costs and practical considerations."],
-  ["05", "Confirm your plan", "Choose the option that makes sense for your situation."],
-  ["06", "Coordinate your journey", "Appointments, travel planning and local coordination can be arranged."],
-  ["07", "Treatment in India", "Receive care through the selected hospital and specialist team."],
-  ["08", "Follow-up", "Continue your recovery and coordinate follow-up as appropriate."],
+  [
+    "01",
+    "Tell us what you need",
+    "Start with a treatment, condition, procedure or medical question.",
+  ],
+  [
+    "02",
+    "Share your medical records",
+    "Provide reports, scans and relevant treatment history for review.",
+  ],
+  [
+    "03",
+    "Specialist & hospital matching",
+    "We help identify appropriate specialists and hospital options.",
+  ],
+  [
+    "04",
+    "Compare your options",
+    "Understand treatment pathways, indicative costs and practical considerations.",
+  ],
+  [
+    "05",
+    "Confirm your plan",
+    "Choose the option that makes sense for your situation.",
+  ],
+  [
+    "06",
+    "Coordinate your journey",
+    "Appointments, travel planning and local coordination can be arranged.",
+  ],
+  [
+    "07",
+    "Treatment in India",
+    "Receive care through the selected hospital and specialist team.",
+  ],
+  [
+    "08",
+    "Follow-up",
+    "Continue your recovery and coordinate follow-up as appropriate.",
+  ],
 ]
 
 const faqs = [
-  ["How do I get a treatment estimate?", "Share your medical reports and relevant treatment history. Medpact can coordinate a preliminary review and help you understand an indicative treatment pathway and cost range."],
-  ["Do I need to travel to India before speaking to a doctor?", "No. The initial review can usually begin remotely. Your records can be shared digitally before you decide whether to travel."],
-  ["Can Medpact arrange hospital appointments?", "Medpact can coordinate communication with hospitals and specialists, subject to availability and the clinical suitability of the requested care."],
-  ["Are the prices on this website guaranteed?", "No. Cost figures shown during this initial launch are illustrative benchmarks. Final costs depend on the hospital, specialist, diagnosis, complexity, implants, investigations, length of stay and other factors."],
+  [
+    "How do I get a treatment estimate?",
+    "Share your medical reports and relevant treatment history. Medpact can coordinate a preliminary review and help you understand an indicative treatment pathway and cost range.",
+  ],
+  [
+    "Do I need to travel to India before speaking to a doctor?",
+    "No. The initial review can usually begin remotely. Your records can be shared digitally before you decide whether to travel.",
+  ],
+  [
+    "Can Medpact arrange hospital appointments?",
+    "Medpact can coordinate communication with hospitals and specialists, subject to availability and the clinical suitability of the requested care.",
+  ],
+  [
+    "Are the prices on this website guaranteed?",
+    "No. Cost figures are indicative benchmarks only. Final costs depend on the hospital, specialist, diagnosis, complexity, implants, investigations, length of stay and other factors.",
+  ],
 ]
 
 function scrollToId(id) {
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  document.getElementById(id)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  })
 }
 
 function openWhatsApp(message) {
-  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    message
+  )}`
+
   window.open(url, "_blank", "noopener,noreferrer")
 }
 
-function formatUSD(value) {
-  return `$${value.toLocaleString("en-US")}`
+function money(value, currency = "INR") {
+  if (value === null || value === undefined || value === "") {
+    return "—"
+  }
+
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number(value))
+}
+
+function shortText(value, maxLength = 150) {
+  const text = String(value || "").trim()
+
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  return `${text.slice(0, maxLength).trim()}…`
+}
+
+function normaliseTreatment(row) {
+  return {
+    ...row,
+    featured: !!row.featured,
+    isPublished: !!row.is_published,
+    includes: Array.isArray(row.generally_includes)
+      ? row.generally_includes
+      : [],
+    excludes: Array.isArray(row.commonly_excluded)
+      ? row.commonly_excluded
+      : [],
+  }
 }
 
 export default function MedicalNeedsPage() {
@@ -82,45 +165,146 @@ export default function MedicalNeedsPage() {
   const [activeCategory, setActiveCategory] = useState("All")
   const [openFaq, setOpenFaq] = useState(null)
 
-  const filteredProcedures = useMemo(() => {
+  const [treatments, setTreatments] = useState([])
+  const [loadingTreatments, setLoadingTreatments] = useState(true)
+  const [treatmentError, setTreatmentError] = useState("")
+
+  useEffect(() => {
+    let active = true
+
+    async function loadTreatments() {
+      try {
+        const supabase = getSupabaseBrowserClient()
+
+        const {
+          data,
+          error,
+        } = await supabase
+          .from("medical_treatments")
+          .select("*")
+          .eq("is_published", true)
+          .order("featured", { ascending: false })
+          .order("display_order", { ascending: true })
+          .order("name", { ascending: true })
+
+        if (error) {
+          throw error
+        }
+
+        if (active) {
+          setTreatments(
+            (data || []).map(normaliseTreatment)
+          )
+        }
+      } catch (err) {
+        if (active) {
+          setTreatmentError(
+            err.message ||
+              "Unable to load the treatment directory."
+          )
+        }
+      } finally {
+        if (active) {
+          setLoadingTreatments(false)
+        }
+      }
+    }
+
+    loadTreatments()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const categories = useMemo(() => {
+    const values = Array.from(
+      new Set(
+        treatments
+          .map((item) => item.category)
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+
+    return ["All", ...values]
+  }, [treatments])
+
+  const filteredTreatments = useMemo(() => {
     const normalized = query.trim().toLowerCase()
 
-    return procedures
-      .filter((item) => activeCategory === "All" || item.category === activeCategory)
+    return treatments
       .filter((item) => {
-        if (!normalized) return true
+        if (
+          activeCategory !== "All" &&
+          item.category !== activeCategory
+        ) {
+          return false
+        }
+
+        if (!normalized) {
+          return true
+        }
+
         return [
           item.name,
           item.specialty,
           item.category,
           item.description,
-        ].some((value) => value.toLowerCase().includes(normalized))
+          item.typical_stay,
+          item.recovery_time,
+          item.international_note,
+          ...(item.includes || []),
+          ...(item.excludes || []),
+        ]
+          .filter(Boolean)
+          .some((value) =>
+            String(value)
+              .toLowerCase()
+              .includes(normalized)
+          )
       })
       .slice(0, 6)
-  }, [activeCategory, query])
+  }, [treatments, query, activeCategory])
 
   const searchResults = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    if (!normalized) return []
+
+    if (!normalized) {
+      return []
+    }
 
     const results = []
 
-    procedures.forEach((item) => {
-      if (
-        item.name.toLowerCase().includes(normalized) ||
-        item.specialty.toLowerCase().includes(normalized) ||
-        item.category.toLowerCase().includes(normalized)
-      ) {
+    treatments.forEach((item) => {
+      const matches = [
+        item.name,
+        item.specialty,
+        item.category,
+        item.description,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value)
+            .toLowerCase()
+            .includes(normalized)
+        )
+
+      if (matches) {
         results.push({
           type: "Treatment",
           title: item.name,
-          meta: `${item.specialty} · ${item.stay}`,
-          href: `#treatment-${item.slug}`,
+          meta: `${item.specialty || "Medical care"} · ${
+            item.typical_stay || "Stay varies"
+          }`,
+          href: `/medicalneeds/treatments/${item.slug}`,
         })
       }
     })
 
-    if ("doctor".includes(normalized) || "specialist".includes(normalized)) {
+    if (
+      "doctor".includes(normalized) ||
+      "specialist".includes(normalized)
+    ) {
       results.push({
         type: "Directory",
         title: "Doctors Directory",
@@ -138,8 +322,31 @@ export default function MedicalNeedsPage() {
       })
     }
 
+    if (
+      "treatment".includes(normalized) ||
+      "procedure".includes(normalized) ||
+      "cost".includes(normalized)
+    ) {
+      results.push({
+        type: "Directory",
+        title: "Treatments & Costs",
+        meta: "Browse the full treatment directory",
+        href: "/medicalneeds/treatments",
+      })
+    }
+
     return results.slice(0, 6)
-  }, [query])
+  }, [query, treatments])
+
+  const costTreatments = useMemo(() => {
+    return treatments
+      .filter(
+        (item) =>
+          item.india_cost_min != null &&
+          item.india_cost_max != null
+      )
+      .slice(0, 3)
+  }, [treatments])
 
   function startMedicalReview() {
     openWhatsApp(
@@ -148,33 +355,85 @@ export default function MedicalNeedsPage() {
   }
 
   return (
-    <main className={`${displayFont.variable} ${bodyFont.variable} site`}>
+    <main
+      className={`${displayFont.variable} ${bodyFont.variable} site`}
+    >
       <header className="header">
         <div className="container header-inner">
-          <button className="brand" onClick={() => scrollToId("top")} aria-label="Medpact home">
+          <button
+            className="brand"
+            onClick={() => scrollToId("top")}
+            aria-label="Medpact home"
+          >
             <span className="brand-mark">M</span>
+
             <span className="brand-copy">
               <strong>medpact</strong>
               <small>MEDICAL NEEDS</small>
             </span>
           </button>
 
-          <nav className={`desktop-nav ${mobileMenu ? "mobile-open" : ""}`}>
-            <a href="#treatments" onClick={() => setMobileMenu(false)}>Treatments</a>
-            <a href="/medicalneeds/doctors" onClick={() => setMobileMenu(false)}>Doctors</a>
-            <a href="/medicalneeds/hospitals" onClick={() => setMobileMenu(false)}>Hospitals</a>
-            <a href="#cost-guide" onClick={() => setMobileMenu(false)}>Cost Guide</a>
-            <a href="#journey" onClick={() => setMobileMenu(false)}>How It Works</a>
-            <a href="#partners" onClick={() => setMobileMenu(false)}>For Partners</a>
+          <nav
+            className={`desktop-nav ${
+              mobileMenu ? "mobile-open" : ""
+            }`}
+          >
+            <Link
+              href="/medicalneeds/treatments"
+              onClick={() => setMobileMenu(false)}
+            >
+              Treatments
+            </Link>
+
+            <Link
+              href="/medicalneeds/doctors"
+              onClick={() => setMobileMenu(false)}
+            >
+              Doctors
+            </Link>
+
+            <Link
+              href="/medicalneeds/hospitals"
+              onClick={() => setMobileMenu(false)}
+            >
+              Hospitals
+            </Link>
+
+            <a
+              href="#cost-guide"
+              onClick={() => setMobileMenu(false)}
+            >
+              Cost Guide
+            </a>
+
+            <a
+              href="#journey"
+              onClick={() => setMobileMenu(false)}
+            >
+              How It Works
+            </a>
+
+            <a
+              href="#partners"
+              onClick={() => setMobileMenu(false)}
+            >
+              For Partners
+            </a>
           </nav>
 
           <div className="header-actions">
-            <button className="header-review" onClick={startMedicalReview}>
+            <button
+              className="header-review"
+              onClick={startMedicalReview}
+            >
               Get Medical Review <span>↗</span>
             </button>
+
             <button
               className="menu-toggle"
-              onClick={() => setMobileMenu((value) => !value)}
+              onClick={() =>
+                setMobileMenu((value) => !value)
+              }
               aria-label="Toggle navigation"
               aria-expanded={mobileMenu}
             >
@@ -190,37 +449,72 @@ export default function MedicalNeedsPage() {
 
         <div className="container hero-grid">
           <div className="hero-copy">
-            <div className="eyebrow"><span /> MEDPACT MEDICAL NEEDS</div>
+            <div className="eyebrow">
+              <span />
+              MEDPACT MEDICAL NEEDS
+            </div>
+
             <h1>
               Find the right care in India.
               <em>Know your options before you travel.</em>
             </h1>
+
             <p className="hero-lead">
-              Explore specialists, hospitals, treatments and indicative costs —
-              then let Medpact help coordinate the journey.
+              Explore specialists, hospitals, treatments and
+              indicative costs — then let Medpact help coordinate
+              the journey.
             </p>
 
             <div className="search-shell">
               <div className="search-row">
                 <span className="search-icon">⌕</span>
+
                 <input
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) =>
+                    setQuery(event.target.value)
+                  }
                   placeholder="What treatment, condition or specialist are you looking for?"
                   aria-label="Search medical needs"
                 />
-                <button onClick={() => scrollToId("treatments")}>Search</button>
+
+                <button
+                  onClick={() => {
+                    if (query.trim()) {
+                      scrollToId("treatments")
+                    } else {
+                      window.location.href =
+                        "/medicalneeds/treatments"
+                    }
+                  }}
+                >
+                  Search
+                </button>
               </div>
 
               {searchResults.length > 0 && (
                 <div className="search-results">
                   {searchResults.map((result) => (
-                    <a key={`${result.type}-${result.title}`} href={result.href} onClick={() => setQuery("")}>
-                      <span className="result-type">{result.type}</span>
+                    <Link
+                      key={`${result.type}-${result.title}`}
+                      href={result.href}
+                      onClick={() => {
+                        setQuery("")
+                        setMobileMenu(false)
+                      }}
+                    >
+                      <span className="result-type">
+                        {result.type}
+                      </span>
+
                       <strong>{result.title}</strong>
+
                       <small>{result.meta}</small>
-                      <span className="result-arrow">→</span>
-                    </a>
+
+                      <span className="result-arrow">
+                        →
+                      </span>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -228,47 +522,102 @@ export default function MedicalNeedsPage() {
 
             <div className="popular-searches">
               <span>Popular</span>
-              {["Knee Replacement", "Heart Bypass", "Dental Implants", "Spine Surgery"].map((item) => (
-                <button key={item} onClick={() => setQuery(item)}>
+
+              {[
+                "Knee Replacement",
+                "CABG",
+                "Dental Implant",
+                "Spinal Fusion",
+              ].map((item) => (
+                <button
+                  key={item}
+                  onClick={() => setQuery(item)}
+                >
                   {item}
                 </button>
               ))}
             </div>
 
             <div className="hero-actions">
-              <button className="button primary" onClick={startMedicalReview}>
+              <button
+                className="button primary"
+                onClick={startMedicalReview}
+              >
                 Get a Medical Review <span>→</span>
               </button>
-              <a className="button secondary" href="#cost-guide">
-                Compare treatment costs
-              </a>
+
+              <Link
+                className="button secondary"
+                href="/medicalneeds/treatments"
+              >
+                Explore treatments <span>→</span>
+              </Link>
             </div>
 
             <div className="trust-row">
-              <span><b>01</b> Medical record review</span>
-              <span><b>02</b> Specialist coordination</span>
-              <span><b>03</b> Journey assistance</span>
+              <span>
+                <b>01</b> Medical record review
+              </span>
+
+              <span>
+                <b>02</b> Specialist coordination
+              </span>
+
+              <span>
+                <b>03</b> Journey assistance
+              </span>
             </div>
           </div>
 
           <div className="hero-panel">
             <div className="panel-top">
               <span>YOUR CARE OPTIONS</span>
-              <span className="live-dot"><i /> Explore</span>
+
+              <span className="live-dot">
+                <i /> Explore
+              </span>
             </div>
 
             <div className="panel-main">
-              <div className="panel-kicker">A better starting point</div>
-              <h2>Understand your choices before making a decision.</h2>
+              <div className="panel-kicker">
+                A better starting point
+              </div>
+
+              <h2>
+                Understand your choices before making a
+                decision.
+              </h2>
+
               <p>
-                Search the care you need, compare options and speak with Medpact
-                when you want help navigating the next step.
+                Search the care you need, compare options and
+                speak with Medpact when you want help navigating
+                the next step.
               </p>
 
               <div className="panel-path">
-                <div><span>01</span><strong>Discover</strong><small>Doctors · hospitals · treatments</small></div>
-                <div><span>02</span><strong>Compare</strong><small>Costs · locations · options</small></div>
-                <div><span>03</span><strong>Coordinate</strong><small>Medical review · appointments</small></div>
+                <div>
+                  <span>01</span>
+                  <strong>Discover</strong>
+                  <small>
+                    Doctors · hospitals · treatments
+                  </small>
+                </div>
+
+                <div>
+                  <span>02</span>
+                  <strong>Compare</strong>
+                  <small>
+                    Costs · locations · options
+                  </small>
+                </div>
+
+                <div>
+                  <span>03</span>
+                  <strong>Coordinate</strong>
+                  <small>
+                    Medical review · appointments
+                  </small>
+                </div>
               </div>
             </div>
 
@@ -283,14 +632,22 @@ export default function MedicalNeedsPage() {
       <section className="discovery-strip">
         <div className="container discovery-grid">
           {discoveryItems.map((item) => (
-            <a className="discovery-card" href={item.href} key={item.title}>
-              <span className="discovery-number">{item.icon}</span>
+            <Link
+              className="discovery-card"
+              href={item.href}
+              key={item.title}
+            >
+              <span className="discovery-number">
+                {item.icon}
+              </span>
+
               <div>
                 <h3>{item.title}</h3>
                 <p>{item.text}</p>
               </div>
+
               <span className="card-arrow">↗</span>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
@@ -299,289 +656,707 @@ export default function MedicalNeedsPage() {
         <div className="container two-col">
           <div>
             <div className="eyebrow">WHY MEDPACT</div>
+
             <h2>
               Healthcare decisions are easier when
               <em>the information is in one place.</em>
             </h2>
           </div>
+
           <div className="intro-copy">
             <p>
-              Finding treatment abroad can involve doctors, hospitals, costs,
-              travel and dozens of practical questions. Medpact brings those
-              pieces together into one structured experience.
+              Finding treatment abroad can involve doctors,
+              hospitals, costs, travel and dozens of practical
+              questions. Medpact brings those pieces together into
+              one structured experience.
             </p>
+
             <p>
-              We help you explore your options first — and step in with human
-              coordination when you are ready.
+              We help you explore your options first — and step in
+              with human coordination when you are ready.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="section treatments-section" id="treatments">
+      <section
+        className="section treatments-section"
+        id="treatments"
+      >
         <div className="container">
           <div className="section-heading">
             <div>
-              <div className="eyebrow">TREATMENTS & PROCEDURES</div>
-              <h2>Start with the <em>right treatment pathway.</em></h2>
+              <div className="eyebrow">
+                TREATMENTS & PROCEDURES
+              </div>
+
+              <h2>
+                Start with the
+                <em>right treatment pathway.</em>
+              </h2>
             </div>
-            <p>
-              Explore common procedures considered by international patients.
-              Cost figures on this initial version are illustrative benchmarks
-              and will be replaced with verified Medpact data.
-            </p>
-          </div>
 
-          <div className="category-scroll">
-            {procedureCategories.map((category) => (
-              <button
-                key={category}
-                className={activeCategory === category ? "active" : ""}
-                onClick={() => setActiveCategory(category)}
+            <div className="section-heading-copy">
+              <p>
+                Explore treatments and procedures commonly
+                considered by international patients. Costs shown
+                here are indicative India ranges from the Medpact
+                treatment database.
+              </p>
+
+              <Link
+                className="directory-link"
+                href="/medicalneeds/treatments"
               >
-                {category}
-              </button>
-            ))}
+                View full treatment directory <span>→</span>
+              </Link>
+            </div>
           </div>
 
-          <div className="procedure-grid">
-            {filteredProcedures.map((procedure) => (
-              <article className="procedure-card" id={`treatment-${procedure.slug}`} key={procedure.id}>
-                <div className="procedure-icon">{procedure.icon}</div>
-                <div className="procedure-meta">
-                  <span>{procedure.category}</span>
-                  <span>{procedure.stay}</span>
-                </div>
-                <h3>{procedure.name}</h3>
-                <p>{procedure.description}</p>
+          {categories.length > 1 && (
+            <div className="category-scroll">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  className={
+                    activeCategory === category
+                      ? "active"
+                      : ""
+                  }
+                  onClick={() =>
+                    setActiveCategory(category)
+                  }
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          )}
 
-                <div className="cost-mini">
-                  <div>
-                    <span>Indicative India range</span>
-                    <strong>{formatUSD(procedure.indiaCost.min)} – {formatUSD(procedure.indiaCost.max)}</strong>
-                  </div>
-                  <div>
-                    <span>International benchmark</span>
-                    <strong>{formatUSD(procedure.internationalBenchmark.min)} – {formatUSD(procedure.internationalBenchmark.max)}</strong>
-                  </div>
+          {loadingTreatments && (
+            <div className="treatment-state">
+              <div className="spinner" />
+
+              <strong>
+                Loading treatment options…
+              </strong>
+
+              <span>
+                Bringing the latest published Medpact treatment
+                information into the home page.
+              </span>
+            </div>
+          )}
+
+          {!loadingTreatments && treatmentError && (
+            <div className="treatment-state error-state">
+              <strong>Unable to load treatments</strong>
+
+              <span>{treatmentError}</span>
+
+              <Link href="/medicalneeds/treatments">
+                Open treatment directory →
+              </Link>
+            </div>
+          )}
+
+          {!loadingTreatments &&
+            !treatmentError &&
+            treatments.length === 0 && (
+              <div className="treatment-state">
+                <strong>
+                  Treatment directory is being curated.
+                </strong>
+
+                <span>
+                  Published treatment profiles will appear here
+                  once they are available.
+                </span>
+
+                <Link href="/medicalneeds/treatments">
+                  Open treatment directory →
+                </Link>
+              </div>
+            )}
+
+          {!loadingTreatments &&
+            !treatmentError &&
+            treatments.length > 0 &&
+            filteredTreatments.length === 0 && (
+              <div className="treatment-state">
+                <strong>No matching treatments</strong>
+
+                <span>
+                  Try another search or choose a different
+                  category.
+                </span>
+
+                <button
+                  onClick={() => {
+                    setQuery("")
+                    setActiveCategory("All")
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+
+          {!loadingTreatments &&
+            !treatmentError &&
+            filteredTreatments.length > 0 && (
+              <>
+                <div className="procedure-grid">
+                  {filteredTreatments.map(
+                    (treatment) => (
+                      <article
+                        className="procedure-card"
+                        key={treatment.id}
+                      >
+                        <div className="procedure-icon">
+                          {treatment.featured
+                            ? "✦"
+                            : "＋"}
+                        </div>
+
+                        <div className="procedure-meta">
+                          <span>
+                            {treatment.category ||
+                              "Treatment"}
+                          </span>
+
+                          <span>
+                            {treatment.typical_stay ||
+                              "Stay varies"}
+                          </span>
+                        </div>
+
+                        <h3>{treatment.name}</h3>
+
+                        <p>
+                          {shortText(
+                            treatment.description ||
+                              "Treatment information is being curated by the Medpact team."
+                          )}
+                        </p>
+
+                        <div className="cost-mini">
+                          <div>
+                            <span>
+                              Indicative India cost
+                            </span>
+
+                            <strong>
+                              {treatment.india_cost_min !=
+                                null &&
+                              treatment.india_cost_max !=
+                                null
+                                ? `${money(
+                                    treatment.india_cost_min
+                                  )} – ${money(
+                                    treatment.india_cost_max
+                                  )}`
+                                : "Cost on request"}
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>Recovery</span>
+
+                            <strong>
+                              {treatment.recovery_time ||
+                                "Varies by case"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <Link
+                          className="card-link"
+                          href={`/medicalneeds/treatments/${treatment.slug}`}
+                        >
+                          Explore treatment{" "}
+                          <span>→</span>
+                        </Link>
+                      </article>
+                    )
+                  )}
                 </div>
 
-                <div className="card-link">Explore treatment <span>→</span></div>
-              </article>
-            ))}
-          </div>
+                <div className="treatment-directory-cta">
+                  <div>
+                    <span>MORE TREATMENTS</span>
+
+                    <strong>
+                      Explore the complete Medpact treatment
+                      directory.
+                    </strong>
+                  </div>
+
+                  <Link
+                    href="/medicalneeds/treatments"
+                    className="button primary"
+                  >
+                    View all treatments <span>→</span>
+                  </Link>
+                </div>
+              </>
+            )}
         </div>
       </section>
 
-      <section className="section cost-section" id="cost-guide">
+      <section
+        className="section cost-section"
+        id="cost-guide"
+      >
         <div className="container">
           <div className="cost-card">
             <div className="cost-copy">
-              <div className="eyebrow light">COST INTELLIGENCE</div>
+              <div className="eyebrow light">
+                COST INTELLIGENCE
+              </div>
+
               <h2>
                 See the cost equation
                 <em>before you travel.</em>
               </h2>
+
               <p>
-                Treatment price is only one part of the decision. We are building
-                Medpact to help you understand hospital, specialist, implant,
-                diagnostics, accommodation and travel considerations together.
+                Treatment price is only one part of the decision.
+                Medpact helps you understand indicative treatment
+                costs together with hospital, specialist,
+                diagnostics, implants and practical considerations.
               </p>
-              <button className="button light-button" onClick={() => scrollToId("treatments")}>
+
+              <Link
+                className="button light-button"
+                href="/medicalneeds/treatments"
+              >
                 Explore cost guide <span>→</span>
-              </button>
+              </Link>
             </div>
 
             <div className="cost-visual">
               <div className="cost-header">
-                <span>ILLUSTRATIVE COMPARISON</span>
-                <span>USD</span>
+                <span>INDICATIVE INDIA COST</span>
+                <span>INR</span>
               </div>
-              {procedures.slice(0, 3).map((procedure) => (
-                <div className="cost-row" key={procedure.id}>
-                  <div className="cost-label">
-                    <strong>{procedure.name}</strong>
-                    <span>India vs international benchmark</span>
+
+              {costTreatments.length > 0 ? (
+                costTreatments.map((treatment) => (
+                  <div
+                    className="cost-row"
+                    key={treatment.id}
+                  >
+                    <div className="cost-label">
+                      <strong>{treatment.name}</strong>
+
+                      <span>
+                        {treatment.specialty ||
+                          "Medical treatment"}
+                      </span>
+                    </div>
+
+                    <div className="cost-bars">
+                      <div>
+                        <i
+                          style={{
+                            width: `${Math.max(
+                              14,
+                              Math.min(
+                                100,
+                                Number(
+                                  treatment.india_cost_max
+                                ) /
+                                  Math.max(
+                                    ...costTreatments.map(
+                                      (item) =>
+                                        Number(
+                                          item.india_cost_max
+                                        )
+                                    )
+                                  ) *
+                                  100
+                              )
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="cost-values">
+                      <strong>
+                        {money(
+                          treatment.india_cost_min
+                        )}{" "}
+                        –{" "}
+                        {money(
+                          treatment.india_cost_max
+                        )}
+                      </strong>
+                    </div>
                   </div>
-                  <div className="cost-bars">
-                    <div><i style={{ width: `${Math.max(10, (procedure.indiaCost.max / procedure.internationalBenchmark.max) * 100)}%` }} /></div>
-                    <div className="benchmark"><i style={{ width: "100%" }} /></div>
-                  </div>
-                  <div className="cost-values">
-                    <strong>{formatUSD(procedure.indiaCost.min)}–{formatUSD(procedure.indiaCost.max)}</strong>
-                    <span>{formatUSD(procedure.internationalBenchmark.min)}–{formatUSD(procedure.internationalBenchmark.max)}</span>
-                  </div>
+                ))
+              ) : (
+                <div className="cost-empty">
+                  Treatment cost information will appear here
+                  as published treatment records become available.
                 </div>
-              ))}
+              )}
+
               <div className="cost-note">
-                Illustrative benchmarks only. Final pricing depends on the patient,
-                hospital, specialist, treatment plan and inclusions.
+                Indicative treatment ranges only. Final pricing
+                depends on diagnosis, hospital, specialist,
+                treatment plan, implants, investigations,
+                length of stay and other factors.
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="section directory-preview" id="doctors">
+      <section className="section directory-preview">
         <div className="container directory-grid">
           <div className="directory-intro">
             <div className="eyebrow">DOCTOR DIRECTORY</div>
-            <h2>Find the specialist who fits the <em>clinical question.</em></h2>
+
+            <h2>
+              Find the specialist who fits the
+              <em>clinical question.</em>
+            </h2>
+
             <p>
-              We are building a verified specialist directory searchable by
-              specialty, sub-specialty, procedure, city, hospital and experience.
+              Explore the Medpact specialist directory and find
+              doctors by specialty, experience and location.
             </p>
-            <button className="text-button" onClick={startMedicalReview}>
-              Need help finding a specialist? <span>Ask Medpact →</span>
-            </button>
+
+            <Link
+              className="text-button"
+              href="/medicalneeds/doctors"
+            >
+              Explore doctors <span>→</span>
+            </Link>
           </div>
 
-          <div className="directory-placeholder">
+          <Link
+            className="directory-placeholder directory-clickable"
+            href="/medicalneeds/doctors"
+          >
             <div className="directory-placeholder-top">
               <span>DOCTORS</span>
-              <span className="status-pill">DIRECTORY READY</span>
+
+              <span className="status-pill">
+                EXPLORE DIRECTORY
+              </span>
             </div>
+
             <div className="placeholder-lines">
-              <div><span className="avatar-placeholder">DR</span><b>Verified specialist profiles</b><small>Specialty · experience · procedures</small></div>
-              <div><span className="avatar-placeholder">DR</span><b>Search by treatment</b><small>Find doctors associated with a procedure</small></div>
-              <div><span className="avatar-placeholder">DR</span><b>Compare options</b><small>Shortlist specialists for review</small></div>
+              <div>
+                <span className="avatar-placeholder">
+                  DR
+                </span>
+
+                <b>Specialist profiles</b>
+
+                <small>
+                  Specialty · experience · procedures
+                </small>
+              </div>
+
+              <div>
+                <span className="avatar-placeholder">
+                  DR
+                </span>
+
+                <b>Search by specialty</b>
+
+                <small>
+                  Find doctors relevant to your needs
+                </small>
+              </div>
+
+              <div>
+                <span className="avatar-placeholder">
+                  DR
+                </span>
+
+                <b>Explore available profiles</b>
+
+                <small>
+                  Review published Medpact records
+                </small>
+              </div>
             </div>
-            <div className="placeholder-footer">Verified records will be added before publication.</div>
-          </div>
+
+            <div className="placeholder-footer">
+              Open the Doctors Directory →
+            </div>
+          </Link>
         </div>
       </section>
 
-      <section className="section hospital-section" id="hospitals">
+      <section className="section hospital-section">
         <div className="container hospital-layout">
-          <div className="hospital-visual">
-            <div className="visual-label">HOSPITAL DIRECTORY</div>
+          <Link
+            href="/medicalneeds/hospitals"
+            className="hospital-visual hospital-clickable"
+          >
+            <div className="visual-label">
+              HOSPITAL DIRECTORY
+            </div>
+
             <div className="visual-center">
               <span>◎</span>
+
               <strong>India</strong>
-              <small>Explore care options by city</small>
+
+              <small>
+                Explore care options by city
+              </small>
             </div>
-            <div className="city-chip chip-one">Chennai</div>
-            <div className="city-chip chip-two">Hyderabad</div>
-            <div className="city-chip chip-three">Bengaluru</div>
-            <div className="city-chip chip-four">Mumbai</div>
-          </div>
+
+            <div className="city-chip chip-one">
+              Chennai
+            </div>
+
+            <div className="city-chip chip-two">
+              Hyderabad
+            </div>
+
+            <div className="city-chip chip-three">
+              Bengaluru
+            </div>
+
+            <div className="city-chip chip-four">
+              Mumbai
+            </div>
+          </Link>
 
           <div className="hospital-copy">
             <div className="eyebrow">HOSPITALS</div>
-            <h2>Choose the <em>right care environment.</em></h2>
+
+            <h2>
+              Choose the
+              <em>right care environment.</em>
+            </h2>
+
             <p>
-              Explore hospitals by city, specialty, procedure and international
-              patient services. Accreditation and service claims will only be
-              displayed after verification.
+              Explore hospitals by city, specialty, procedure
+              and international patient services. Accreditation
+              and service claims will only be displayed after
+              verification.
             </p>
+
             <div className="feature-list">
-              <span>✓ Specialty & procedure coverage</span>
-              <span>✓ International patient services</span>
-              <span>✓ Location & practical information</span>
-              <span>✓ Verified accreditation where applicable</span>
+              <span>
+                ✓ Specialty & procedure coverage
+              </span>
+
+              <span>
+                ✓ International patient services
+              </span>
+
+              <span>
+                ✓ Location & practical information
+              </span>
+
+              <span>
+                ✓ Verified accreditation where applicable
+              </span>
             </div>
-            <button className="button primary" onClick={() => scrollToId("partners")}>
-              Explore the Medpact network <span>→</span>
-            </button>
+
+            <Link
+              className="button primary"
+              href="/medicalneeds/hospitals"
+            >
+              Explore hospitals <span>→</span>
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="section journey-section" id="journey">
+      <section
+        className="section journey-section"
+        id="journey"
+      >
         <div className="container">
           <div className="section-heading">
             <div>
               <div className="eyebrow">YOUR JOURNEY</div>
-              <h2>From medical question to <em>coordinated care.</em></h2>
+
+              <h2>
+                From medical question to
+                <em>coordinated care.</em>
+              </h2>
             </div>
+
             <p>
-              Medical travel can feel complicated. Our role is to make the
-              process more structured, transparent and easier to navigate.
+              Medical travel can feel complicated. Our role is to
+              make the process more structured, transparent and
+              easier to navigate.
             </p>
           </div>
 
           <div className="journey-grid">
-            {journeySteps.map(([number, title, text]) => (
-              <div className="journey-card" key={number}>
-                <span>{number}</span>
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </div>
-            ))}
+            {journeySteps.map(
+              ([number, title, text]) => (
+                <div
+                  className="journey-card"
+                  key={number}
+                >
+                  <span>{number}</span>
+
+                  <h3>{title}</h3>
+
+                  <p>{text}</p>
+                </div>
+              )
+            )}
           </div>
 
           <div className="journey-cta">
             <div>
               <span>READY TO EXPLORE?</span>
-              <h3>Let your medical records start the conversation.</h3>
+
+              <h3>
+                Let your medical records start the
+                conversation.
+              </h3>
             </div>
-            <button className="button primary" onClick={startMedicalReview}>
+
+            <button
+              className="button primary"
+              onClick={startMedicalReview}
+            >
               Get a Medical Review <span>→</span>
             </button>
           </div>
         </div>
       </section>
 
-      <section className="section partner-section" id="partners">
+      <section
+        className="section partner-section"
+        id="partners"
+      >
         <div className="container partner-card">
           <div>
-            <div className="eyebrow light">FOR HEALTHCARE PARTNERS</div>
-            <h2>Extend your care options with <em>Medpact.</em></h2>
+            <div className="eyebrow light">
+              FOR HEALTHCARE PARTNERS
+            </div>
+
+            <h2>
+              Extend your care options with
+              <em>Medpact.</em>
+            </h2>
           </div>
+
           <div>
             <p>
-              Medpact can work with healthcare cost-navigation companies, patient
-              advocacy organizations, medical tourism companies, employers,
-              benefits organizations and international healthcare partners.
+              Medpact can work with healthcare cost-navigation
+              companies, patient advocacy organizations, medical
+              tourism companies, employers, benefits organizations
+              and international healthcare partners.
             </p>
-            <a className="light-link" href={`mailto:${EMAIL}`}>
+
+            <a
+              className="light-link"
+              href={`mailto:${EMAIL}`}
+            >
               Discuss a partnership <span>→</span>
             </a>
           </div>
         </div>
       </section>
 
-      <section className="section faq-section" id="faq">
+      <section
+        className="section faq-section"
+        id="faq"
+      >
         <div className="container faq-layout">
           <div>
             <div className="eyebrow">QUESTIONS</div>
-            <h2>Good decisions start with <em>clear answers.</em></h2>
+
+            <h2>
+              Good decisions start with
+              <em>clear answers.</em>
+            </h2>
+
             <p>
-              If your question is more specific, send your medical enquiry and
-              the Medpact team can help you understand the next step.
+              If your question is more specific, send your medical
+              enquiry and the Medpact team can help you understand
+              the next step.
             </p>
           </div>
 
           <div className="faq-list">
-            {faqs.map(([question, answer], index) => (
-              <div className={`faq-item ${openFaq === index ? "open" : ""}`} key={question}>
-                <button onClick={() => setOpenFaq(openFaq === index ? null : index)}>
-                  <span>{question}</span>
-                  <b>{openFaq === index ? "−" : "+"}</b>
-                </button>
-                {openFaq === index && <p>{answer}</p>}
-              </div>
-            ))}
+            {faqs.map(
+              ([question, answer], index) => (
+                <div
+                  className={`faq-item ${
+                    openFaq === index ? "open" : ""
+                  }`}
+                  key={question}
+                >
+                  <button
+                    onClick={() =>
+                      setOpenFaq(
+                        openFaq === index
+                          ? null
+                          : index
+                      )
+                    }
+                  >
+                    <span>{question}</span>
+
+                    <b>
+                      {openFaq === index
+                        ? "−"
+                        : "+"}
+                    </b>
+                  </button>
+
+                  {openFaq === index && (
+                    <p>{answer}</p>
+                  )}
+                </div>
+              )
+            )}
           </div>
         </div>
       </section>
 
-      <section className="review-section" id="medical-review">
+      <section className="review-section">
         <div className="container review-card">
           <div>
-            <div className="eyebrow light">MEDPACT MEDICAL REVIEW</div>
+            <div className="eyebrow light">
+              MEDPACT MEDICAL REVIEW
+            </div>
+
             <h2>Not sure where to start?</h2>
+
             <p>
-              Share what you know about your treatment need. We can help you
-              understand the options worth exploring in India.
+              Share what you know about your treatment need. We
+              can help you understand the options worth exploring
+              in India.
             </p>
           </div>
+
           <div className="review-actions">
-            <button className="button light-button" onClick={startMedicalReview}>
+            <button
+              className="button light-button"
+              onClick={startMedicalReview}
+            >
               Start my enquiry <span>→</span>
             </button>
-            <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
-            <a href={`tel:${PHONE.replace(/\s/g, "")}`}>{PHONE}</a>
+
+            <a href={`mailto:${EMAIL}`}>
+              {EMAIL}
+            </a>
+
+            <a
+              href={`tel:${PHONE.replace(/\s/g, "")}`}
+            >
+              {PHONE}
+            </a>
           </div>
         </div>
       </section>
@@ -589,61 +1364,144 @@ export default function MedicalNeedsPage() {
       <footer className="footer">
         <div className="container footer-grid">
           <div>
-            <div className="footer-brand"><span className="brand-mark">M</span><strong>medpact</strong></div>
+            <div className="footer-brand">
+              <span className="brand-mark">M</span>
+              <strong>medpact</strong>
+            </div>
+
             <p>
-              Medical care discovery and coordination for patients considering
-              treatment in India.
+              Medical care discovery and coordination for
+              patients considering treatment in India.
             </p>
           </div>
 
           <div>
-            <span className="footer-heading">Explore</span>
-            <a href="#treatments">Treatments</a>
-            <a href="/medicalneeds/doctors">Doctors</a>
-            <a href="/medicalneeds/hospitals">Hospitals</a>
-            <a href="#cost-guide">Cost Guide</a>
+            <span className="footer-heading">
+              Explore
+            </span>
+
+            <Link href="/medicalneeds/treatments">
+              Treatments
+            </Link>
+
+            <Link href="/medicalneeds/doctors">
+              Doctors
+            </Link>
+
+            <Link href="/medicalneeds/hospitals">
+              Hospitals
+            </Link>
+
+            <a href="#cost-guide">
+              Cost Guide
+            </a>
           </div>
 
           <div>
-            <span className="footer-heading">Medpact</span>
-            <a href="#journey">How It Works</a>
-            <a href="#partners">For Partners</a>
-            <a href="#faq">FAQs</a>
-            <button onClick={startMedicalReview}>Medical Review</button>
+            <span className="footer-heading">
+              Medpact
+            </span>
+
+            <a href="#journey">
+              How It Works
+            </a>
+
+            <a href="#partners">
+              For Partners
+            </a>
+
+            <a href="#faq">
+              FAQs
+            </a>
+
+            <button onClick={startMedicalReview}>
+              Medical Review
+            </button>
           </div>
 
           <div>
-            <span className="footer-heading">Contact</span>
-            <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
-            <a href={`tel:${PHONE.replace(/\s/g, "")}`}>{PHONE}</a>
-            <button onClick={() => openWhatsApp("Hello Medpact, I would like to explore medical treatment in India.")}>
+            <span className="footer-heading">
+              Contact
+            </span>
+
+            <a href={`mailto:${EMAIL}`}>
+              {EMAIL}
+            </a>
+
+            <a
+              href={`tel:${PHONE.replace(/\s/g, "")}`}
+            >
+              {PHONE}
+            </a>
+
+            <button
+              onClick={() =>
+                openWhatsApp(
+                  "Hello Medpact, I would like to explore medical treatment in India."
+                )
+              }
+            >
               WhatsApp
             </button>
           </div>
         </div>
 
         <div className="container footer-bottom">
-          <span>© {new Date().getFullYear()} Medpact. All rights reserved.</span>
-          <span>Information on this website is for general guidance and is not medical advice.</span>
+          <span>
+            © {new Date().getFullYear()} Medpact. All rights
+            reserved.
+          </span>
+
+          <span>
+            Information on this website is for general guidance
+            and is not medical advice.
+          </span>
         </div>
       </footer>
 
-      <button className="floating-assistant" onClick={startMedicalReview}>
+      <button
+        className="floating-assistant"
+        onClick={startMedicalReview}
+      >
         <span>✦</span>
         <b>Ask Medpact</b>
       </button>
 
       <div className="mobile-review-bar">
-        <button onClick={startMedicalReview}>Get a Medical Review <span>→</span></button>
+        <button onClick={startMedicalReview}>
+          Get a Medical Review <span>→</span>
+        </button>
       </div>
 
       <style jsx>{`
-        :global(*) { box-sizing: border-box; }
-        :global(html) { scroll-behavior: smooth; }
-        :global(body) { margin: 0; background: #f7f8f5; color: #17201d; }
-        :global(button), :global(input) { font: inherit; }
-        :global(button), :global(a) { -webkit-tap-highlight-color: transparent; }
-        :global(a) { color: inherit; text-decoration: none; }
+        :global(*) {
+          box-sizing: border-box;
+        }
+
+        :global(html) {
+          scroll-behavior: smooth;
+        }
+
+        :global(body) {
+          margin: 0;
+          background: #f7f8f5;
+          color: #17201d;
+        }
+
+        :global(button),
+        :global(input) {
+          font: inherit;
+        }
+
+        :global(button),
+        :global(a) {
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        :global(a) {
+          color: inherit;
+          text-decoration: none;
+        }
 
         .site {
           --ink: #17201d;
@@ -656,9 +1514,8 @@ export default function MedicalNeedsPage() {
           --green-2: #20574a;
           --mint: #dcebe2;
           --gold: #c8a968;
-          --font-display: ${displayFont.style.fontFamily};
-          --font-body: ${bodyFont.style.fontFamily};
-          font-family: var(--font-body);
+
+          font-family: ${bodyFont.style.fontFamily};
           min-height: 100vh;
           overflow-x: hidden;
         }
@@ -672,9 +1529,9 @@ export default function MedicalNeedsPage() {
           position: sticky;
           top: 0;
           z-index: 50;
-          background: rgba(247, 248, 245, .9);
+          background: rgba(247, 248, 245, 0.9);
           backdrop-filter: blur(18px);
-          border-bottom: 1px solid rgba(223, 228, 223, .85);
+          border-bottom: 1px solid rgba(223, 228, 223, 0.85);
         }
 
         .header-inner {
@@ -696,7 +1553,7 @@ export default function MedicalNeedsPage() {
           text-align: left;
         }
 
-        .brand-mark, .footer-brand .brand-mark {
+        .brand-mark {
           width: 38px;
           height: 38px;
           border-radius: 11px;
@@ -704,14 +1561,28 @@ export default function MedicalNeedsPage() {
           color: white;
           display: grid;
           place-items: center;
-          font-family: var(--font-display);
+          font-family: ${displayFont.style.fontFamily};
           font-size: 22px;
           font-weight: 600;
         }
 
-        .brand-copy { display: grid; line-height: 1; }
-        .brand-copy strong { font-size: 21px; letter-spacing: -.7px; }
-        .brand-copy small { margin-top: 5px; font-size: 7px; letter-spacing: 2.2px; font-weight: 700; color: var(--muted); }
+        .brand-copy {
+          display: grid;
+          line-height: 1;
+        }
+
+        .brand-copy strong {
+          font-size: 21px;
+          letter-spacing: -0.7px;
+        }
+
+        .brand-copy small {
+          margin-top: 5px;
+          font-size: 7px;
+          letter-spacing: 2.2px;
+          font-weight: 700;
+          color: var(--muted);
+        }
 
         .desktop-nav {
           margin-left: auto;
@@ -724,13 +1595,21 @@ export default function MedicalNeedsPage() {
           font-size: 13px;
           font-weight: 600;
           color: #52605a;
-          transition: color .2s ease;
+          transition: color 0.2s ease;
         }
 
-        .desktop-nav a:hover { color: var(--green); }
+        .desktop-nav a:hover {
+          color: var(--green);
+        }
 
-        .header-actions { display: flex; align-items: center; gap: 10px; }
-        .header-review, .menu-toggle {
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .header-review,
+        .menu-toggle {
           border: 0;
           cursor: pointer;
         }
@@ -744,26 +1623,64 @@ export default function MedicalNeedsPage() {
           font-weight: 700;
         }
 
-        .header-review span { margin-left: 7px; color: #b9d7c5; }
-        .menu-toggle { display: none; background: transparent; font-size: 27px; color: var(--ink); }
+        .header-review span {
+          margin-left: 7px;
+          color: #b9d7c5;
+        }
+
+        .menu-toggle {
+          display: none;
+          background: transparent;
+          font-size: 27px;
+          color: var(--ink);
+        }
 
         .hero {
           position: relative;
           overflow: hidden;
           padding: 92px 0 80px;
           background:
-            radial-gradient(circle at 80% 22%, rgba(196, 224, 210, .55), transparent 30%),
-            linear-gradient(180deg, #f7f8f5 0%, #eef3ee 100%);
+            radial-gradient(
+              circle at 80% 22%,
+              rgba(196, 224, 210, 0.55),
+              transparent 30%
+            ),
+            linear-gradient(
+              180deg,
+              #f7f8f5 0%,
+              #eef3ee 100%
+            );
         }
 
-        .hero-orb { position: absolute; border-radius: 50%; filter: blur(2px); pointer-events: none; }
-        .hero-orb-one { width: 340px; height: 340px; right: -150px; top: 100px; background: rgba(199, 220, 207, .45); }
-        .hero-orb-two { width: 210px; height: 210px; left: -120px; bottom: 0; background: rgba(225, 210, 171, .18); }
+        .hero-orb {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(2px);
+          pointer-events: none;
+        }
+
+        .hero-orb-one {
+          width: 340px;
+          height: 340px;
+          right: -150px;
+          top: 100px;
+          background: rgba(199, 220, 207, 0.45);
+        }
+
+        .hero-orb-two {
+          width: 210px;
+          height: 210px;
+          left: -120px;
+          bottom: 0;
+          background: rgba(225, 210, 171, 0.18);
+        }
 
         .hero-grid {
           position: relative;
           display: grid;
-          grid-template-columns: minmax(0, 1.12fr) minmax(360px, .78fr);
+          grid-template-columns:
+            minmax(0, 1.12fr)
+            minmax(360px, 0.78fr);
           gap: 80px;
           align-items: center;
         }
@@ -786,19 +1703,22 @@ export default function MedicalNeedsPage() {
           background: var(--gold);
         }
 
-        .eyebrow.light { color: #b7cbc2; }
+        .eyebrow.light {
+          color: #b7cbc2;
+        }
 
         .hero h1 {
           margin: 22px 0 24px;
           max-width: 760px;
-          font-family: var(--font-display);
+          font-family: ${displayFont.style.fontFamily};
           font-size: clamp(52px, 6.2vw, 84px);
-          line-height: .94;
+          line-height: 0.94;
           letter-spacing: -3.8px;
           font-weight: 500;
         }
 
-        .hero h1 em, h2 em {
+        .hero h1 em,
+        h2 em {
           display: block;
           font-style: italic;
           color: #315b4f;
@@ -827,10 +1747,15 @@ export default function MedicalNeedsPage() {
           background: white;
           border: 1px solid #d8dfd9;
           border-radius: 18px;
-          box-shadow: 0 18px 45px rgba(34, 57, 48, .08);
+          box-shadow: 0 18px 45px rgba(34, 57, 48, 0.08);
         }
 
-        .search-icon { font-size: 28px; line-height: 1; color: #66736d; }
+        .search-icon {
+          font-size: 28px;
+          line-height: 1;
+          color: #66736d;
+        }
+
         .search-row input {
           min-width: 0;
           flex: 1;
@@ -841,7 +1766,10 @@ export default function MedicalNeedsPage() {
           font-size: 14px;
         }
 
-        .search-row input::placeholder { color: #98a29d; }
+        .search-row input::placeholder {
+          color: #98a29d;
+        }
+
         .search-row button {
           border: 0;
           background: var(--green);
@@ -862,7 +1790,7 @@ export default function MedicalNeedsPage() {
           background: white;
           border: 1px solid #dce3dd;
           border-radius: 16px;
-          box-shadow: 0 25px 50px rgba(30, 48, 41, .13);
+          box-shadow: 0 25px 50px rgba(30, 48, 41, 0.13);
         }
 
         .search-results a {
@@ -873,12 +1801,39 @@ export default function MedicalNeedsPage() {
           border-bottom: 1px solid #edf0ed;
         }
 
-        .search-results a:last-child { border-bottom: 0; }
-        .search-results a:hover { background: #f5f8f5; }
-        .result-type { grid-row: span 2; align-self: center; color: #718078; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-        .search-results strong { font-size: 13px; }
-        .search-results small { color: var(--muted); font-size: 11px; }
-        .result-arrow { grid-column: 3; grid-row: 1 / 3; align-self: center; color: var(--green); }
+        .search-results a:last-child {
+          border-bottom: 0;
+        }
+
+        .search-results a:hover {
+          background: #f5f8f5;
+        }
+
+        .result-type {
+          grid-row: span 2;
+          align-self: center;
+          color: #718078;
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        .search-results strong {
+          font-size: 13px;
+        }
+
+        .search-results small {
+          color: var(--muted);
+          font-size: 11px;
+        }
+
+        .result-arrow {
+          grid-column: 3;
+          grid-row: 1 / 3;
+          align-self: center;
+          color: var(--green);
+        }
 
         .popular-searches {
           display: flex;
@@ -899,7 +1854,7 @@ export default function MedicalNeedsPage() {
 
         .popular-searches button {
           border: 1px solid #d8dfda;
-          background: rgba(255,255,255,.65);
+          background: rgba(255, 255, 255, 0.65);
           color: #58665f;
           border-radius: 999px;
           padding: 7px 10px;
@@ -907,7 +1862,12 @@ export default function MedicalNeedsPage() {
           cursor: pointer;
         }
 
-        .hero-actions { display: flex; gap: 10px; margin-top: 27px; }
+        .hero-actions {
+          display: flex;
+          gap: 10px;
+          margin-top: 27px;
+        }
+
         .button {
           min-height: 48px;
           display: inline-flex;
@@ -923,9 +1883,20 @@ export default function MedicalNeedsPage() {
           text-decoration: none;
         }
 
-        .button.primary { background: var(--green); color: white; }
-        .button.secondary { border-color: #cfd8d2; color: var(--green); background: rgba(255,255,255,.5); }
-        .button span { color: #b9d7c5; }
+        .button.primary {
+          background: var(--green);
+          color: white;
+        }
+
+        .button.secondary {
+          border-color: #cfd8d2;
+          color: var(--green);
+          background: rgba(255, 255, 255, 0.5);
+        }
+
+        .button span {
+          color: #b9d7c5;
+        }
 
         .trust-row {
           display: flex;
@@ -936,7 +1907,10 @@ export default function MedicalNeedsPage() {
           font-size: 10px;
         }
 
-        .trust-row b { color: var(--gold); margin-right: 6px; }
+        .trust-row b {
+          color: var(--gold);
+          margin-right: 6px;
+        }
 
         .hero-panel {
           min-height: 510px;
@@ -945,7 +1919,7 @@ export default function MedicalNeedsPage() {
           color: white;
           padding: 20px;
           position: relative;
-          box-shadow: 0 30px 70px rgba(22, 62, 53, .2);
+          box-shadow: 0 30px 70px rgba(22, 62, 53, 0.2);
           overflow: hidden;
         }
 
@@ -954,13 +1928,14 @@ export default function MedicalNeedsPage() {
           position: absolute;
           width: 350px;
           height: 350px;
-          border: 1px solid rgba(255,255,255,.08);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 50%;
           right: -150px;
           bottom: -140px;
         }
 
-        .panel-top, .panel-footer {
+        .panel-top,
+        .panel-footer {
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -970,8 +1945,21 @@ export default function MedicalNeedsPage() {
           font-weight: 800;
         }
 
-        .live-dot { color: #d4e7dc; letter-spacing: 0; text-transform: none; display: flex; align-items: center; gap: 6px; }
-        .live-dot i { width: 6px; height: 6px; border-radius: 50%; background: #b5d7bd; }
+        .live-dot {
+          color: #d4e7dc;
+          letter-spacing: 0;
+          text-transform: none;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .live-dot i {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #b5d7bd;
+        }
 
         .panel-main {
           position: relative;
@@ -979,30 +1967,88 @@ export default function MedicalNeedsPage() {
           padding: 105px 28px 60px;
         }
 
-        .panel-kicker { color: #b6d0c3; text-transform: uppercase; letter-spacing: 2px; font-size: 9px; font-weight: 800; }
-        .panel-main h2 { font-family: var(--font-display); font-size: 47px; line-height: .98; letter-spacing: -1.8px; font-weight: 500; margin: 14px 0 18px; }
-        .panel-main p { color: #b7c9c1; font-size: 13px; line-height: 1.7; max-width: 410px; }
+        .panel-kicker {
+          color: #b6d0c3;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          font-size: 9px;
+          font-weight: 800;
+        }
 
-        .panel-path { margin-top: 34px; display: grid; gap: 11px; }
+        .panel-main h2 {
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 47px;
+          line-height: 0.98;
+          letter-spacing: -1.8px;
+          font-weight: 500;
+          margin: 14px 0 18px;
+          color: white;
+        }
+
+        .panel-main p {
+          color: #b7c9c1;
+          font-size: 13px;
+          line-height: 1.7;
+          max-width: 410px;
+        }
+
+        .panel-path {
+          margin-top: 34px;
+          display: grid;
+          gap: 11px;
+        }
+
         .panel-path div {
           display: grid;
           grid-template-columns: 38px 95px 1fr;
           gap: 10px;
           align-items: center;
           padding: 12px 13px;
-          border: 1px solid rgba(255,255,255,.09);
+          border: 1px solid rgba(255, 255, 255, 0.09);
           border-radius: 12px;
-          background: rgba(255,255,255,.035);
+          background: rgba(255, 255, 255, 0.035);
         }
 
-        .panel-path span { color: #8fb0a2; font-size: 9px; }
-        .panel-path strong { font-size: 11px; }
-        .panel-path small { color: #91aaa0; font-size: 9px; }
-        .panel-footer { position: absolute; bottom: 20px; left: 20px; right: 20px; border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; }
-        .panel-footer strong { color: white; letter-spacing: 0; text-transform: lowercase; font-size: 11px; }
+        .panel-path span {
+          color: #8fb0a2;
+          font-size: 9px;
+        }
 
-        .discovery-strip { background: white; border-bottom: 1px solid var(--line); }
-        .discovery-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+        .panel-path strong {
+          font-size: 11px;
+        }
+
+        .panel-path small {
+          color: #91aaa0;
+          font-size: 9px;
+        }
+
+        .panel-footer {
+          position: absolute;
+          bottom: 20px;
+          left: 20px;
+          right: 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          padding-top: 14px;
+        }
+
+        .panel-footer strong {
+          color: white;
+          letter-spacing: 0;
+          text-transform: lowercase;
+          font-size: 11px;
+        }
+
+        .discovery-strip {
+          background: white;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .discovery-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+        }
+
         .discovery-card {
           min-height: 150px;
           display: grid;
@@ -1013,28 +2059,117 @@ export default function MedicalNeedsPage() {
           border-right: 1px solid var(--line);
         }
 
-        .discovery-card:first-child { border-left: 1px solid var(--line); }
-        .discovery-number { color: var(--gold); font-size: 10px; font-weight: 800; align-self: start; padding-top: 2px; }
-        .discovery-card h3 { margin: 0 0 6px; font-family: var(--font-display); font-size: 23px; font-weight: 500; }
-        .discovery-card p { margin: 0; color: #77827c; font-size: 11px; line-height: 1.55; }
-        .card-arrow { color: var(--green); font-size: 18px; }
+        .discovery-card:first-child {
+          border-left: 1px solid var(--line);
+        }
 
-        .section { padding: 105px 0; }
-        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; }
-        h2 { font-family: var(--font-display); font-size: clamp(42px, 5vw, 62px); line-height: .98; letter-spacing: -2.6px; font-weight: 500; margin: 18px 0 0; }
-        .intro-copy { padding-top: 27px; }
-        .intro-copy p, .section-heading > p, .hospital-copy > p, .faq-layout > div > p, .directory-intro > p {
+        .discovery-number {
+          color: var(--gold);
+          font-size: 10px;
+          font-weight: 800;
+          align-self: start;
+          padding-top: 2px;
+        }
+
+        .discovery-card h3 {
+          margin: 0 0 6px;
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 23px;
+          font-weight: 500;
+        }
+
+        .discovery-card p {
+          margin: 0;
+          color: #77827c;
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
+        .card-arrow {
+          color: var(--green);
+          font-size: 18px;
+        }
+
+        .section {
+          padding: 105px 0;
+        }
+
+        .two-col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 100px;
+        }
+
+        h2 {
+          font-family: ${displayFont.style.fontFamily};
+          font-size: clamp(42px, 5vw, 62px);
+          line-height: 0.98;
+          letter-spacing: -2.6px;
+          font-weight: 500;
+          margin: 18px 0 0;
+        }
+
+        .intro-copy {
+          padding-top: 27px;
+        }
+
+        .intro-copy p,
+        .section-heading > p,
+        .hospital-copy > p,
+        .faq-layout > div > p,
+        .directory-intro > p {
           color: var(--muted);
           font-size: 14px;
           line-height: 1.85;
           margin: 0 0 17px;
         }
 
-        .treatments-section { background: white; }
-        .section-heading { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: end; margin-bottom: 38px; }
-        .section-heading > p { margin: 0; }
-        .category-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 23px; scrollbar-width: none; }
-        .category-scroll::-webkit-scrollbar { display: none; }
+        .treatments-section {
+          background: white;
+        }
+
+        .section-heading {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 80px;
+          align-items: end;
+          margin-bottom: 38px;
+        }
+
+        .section-heading > p {
+          margin: 0;
+        }
+
+        .section-heading-copy > p {
+          color: var(--muted);
+          font-size: 14px;
+          line-height: 1.85;
+          margin: 0 0 16px;
+        }
+
+        .directory-link {
+          color: var(--green);
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .directory-link span {
+          margin-left: 6px;
+        }
+
+        .category-scroll {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding-bottom: 10px;
+          margin-bottom: 23px;
+          scrollbar-width: none;
+        }
+
+        .category-scroll::-webkit-scrollbar {
+          display: none;
+        }
+
         .category-scroll button {
           flex: 0 0 auto;
           border: 1px solid #dbe1dc;
@@ -1046,147 +2181,913 @@ export default function MedicalNeedsPage() {
           font-size: 11px;
           font-weight: 700;
         }
-        .category-scroll button.active { background: var(--green); border-color: var(--green); color: white; }
 
-        .procedure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .category-scroll button.active {
+          background: var(--green);
+          border-color: var(--green);
+          color: white;
+        }
+
+        .procedure-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+        }
+
         .procedure-card {
           position: relative;
-          min-height: 340px;
+          min-height: 350px;
           border: 1px solid #e0e5e1;
           border-radius: 20px;
           padding: 22px;
           background: #fbfcfb;
-          transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+          transition:
+            transform 0.25s ease,
+            box-shadow 0.25s ease,
+            border-color 0.25s ease;
         }
-        .procedure-card:hover { transform: translateY(-4px); border-color: #cbd8d0; box-shadow: 0 18px 35px rgba(32, 65, 53, .08); }
-        .procedure-icon { width: 42px; height: 42px; display: grid; place-items: center; background: #e7f0e9; color: var(--green); border-radius: 13px; font-size: 20px; }
-        .procedure-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 28px; color: #829089; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-        .procedure-card h3 { font-family: var(--font-display); font-size: 28px; line-height: 1; letter-spacing: -.7px; font-weight: 500; margin: 9px 0 9px; }
-        .procedure-card > p { min-height: 54px; color: #78837e; font-size: 11px; line-height: 1.65; }
-        .cost-mini { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 17px; }
-        .cost-mini div { background: #f1f4f1; padding: 10px; border-radius: 10px; }
-        .cost-mini span { display: block; color: #8b958f; font-size: 8px; line-height: 1.35; margin-bottom: 4px; }
-        .cost-mini strong { display: block; color: #27483e; font-size: 10px; line-height: 1.35; }
-        .card-link { position: absolute; left: 22px; right: 22px; bottom: 18px; border-top: 1px solid #e3e8e4; padding-top: 13px; color: var(--green); font-size: 10px; font-weight: 800; }
-        .card-link span { float: right; }
 
-        .cost-section { background: #eef2ee; }
-        .cost-card { display: grid; grid-template-columns: .78fr 1.22fr; overflow: hidden; border-radius: 27px; background: var(--green); color: white; box-shadow: 0 25px 55px rgba(23, 54, 46, .14); }
-        .cost-copy { padding: 54px; }
-        .cost-copy h2 { font-size: 55px; }
-        .cost-copy h2 em { color: #c7dfd1; }
-        .cost-copy p { max-width: 440px; color: #b8cbc2; font-size: 13px; line-height: 1.8; margin: 23px 0 28px; }
-        .light-button { background: white; color: var(--green); }
-        .light-button span { color: var(--green-2); }
-        .cost-visual { padding: 37px; background: #102f28; }
-        .cost-header { display: flex; justify-content: space-between; color: #87a399; font-size: 9px; letter-spacing: 1.6px; font-weight: 800; padding-bottom: 20px; }
-        .cost-row { display: grid; grid-template-columns: 1.05fr 1fr .75fr; gap: 18px; align-items: center; padding: 18px 0; border-top: 1px solid rgba(255,255,255,.09); }
-        .cost-label strong { display: block; font-family: var(--font-display); font-size: 19px; font-weight: 500; }
-        .cost-label span { display: block; color: #809b90; font-size: 8px; margin-top: 4px; }
-        .cost-bars { display: grid; gap: 6px; }
-        .cost-bars > div { height: 6px; border-radius: 10px; background: rgba(255,255,255,.08); overflow: hidden; }
-        .cost-bars i { display: block; height: 100%; border-radius: inherit; background: #a8cdb9; }
-        .cost-bars .benchmark i { background: #718d82; }
-        .cost-values { text-align: right; }
-        .cost-values strong, .cost-values span { display: block; font-size: 9px; }
-        .cost-values strong { color: #d7e7df; }
-        .cost-values span { color: #789287; margin-top: 4px; }
-        .cost-note { margin-top: 20px; color: #718d82; font-size: 8px; line-height: 1.6; }
+        .procedure-card:hover {
+          transform: translateY(-4px);
+          border-color: #cbd8d0;
+          box-shadow: 0 18px 35px rgba(32, 65, 53, 0.08);
+        }
 
-        .directory-preview { background: white; }
-        .directory-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 100px; align-items: center; }
-        .directory-intro h2 { margin-bottom: 24px; }
-        .text-button { border: 0; background: transparent; padding: 0; color: #6d7973; cursor: pointer; font-size: 11px; text-align: left; }
-        .text-button span { color: var(--green); font-weight: 800; }
-        .directory-placeholder { border: 1px solid #dfe5e1; border-radius: 23px; background: #f7f9f7; padding: 24px; }
-        .directory-placeholder-top { display: flex; justify-content: space-between; color: #718079; font-size: 9px; letter-spacing: 1.5px; font-weight: 800; padding-bottom: 17px; border-bottom: 1px solid #e2e7e3; }
-        .status-pill { border-radius: 999px; padding: 6px 9px; background: #e3eee7; color: #346051; letter-spacing: .7px; }
-        .placeholder-lines { display: grid; gap: 0; }
-        .placeholder-lines > div { display: grid; grid-template-columns: 40px 1fr; gap: 3px 13px; align-items: center; padding: 19px 0; border-bottom: 1px solid #e3e8e4; }
-        .avatar-placeholder { grid-row: span 2; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #dce8df; color: #557467; font-size: 9px; font-weight: 800; }
-        .placeholder-lines b { font-size: 12px; }
-        .placeholder-lines small { color: #89948e; font-size: 9px; }
-        .placeholder-footer { color: #8a958f; font-size: 9px; margin-top: 17px; }
+        .procedure-icon {
+          width: 42px;
+          height: 42px;
+          display: grid;
+          place-items: center;
+          background: #e7f0e9;
+          color: var(--green);
+          border-radius: 13px;
+          font-size: 18px;
+        }
 
-        .hospital-section { background: #f1f4f1; }
-        .hospital-layout { display: grid; grid-template-columns: 1.05fr .95fr; gap: 100px; align-items: center; }
-        .hospital-visual { min-height: 470px; border-radius: 27px; background: radial-gradient(circle at center, #345e51 0%, #173d34 43%, #0f2e27 100%); position: relative; overflow: hidden; display: grid; place-items: center; box-shadow: 0 25px 55px rgba(22,62,53,.15); }
-        .hospital-visual::before, .hospital-visual::after { content: ""; position: absolute; border: 1px solid rgba(255,255,255,.08); border-radius: 50%; }
-        .hospital-visual::before { width: 330px; height: 330px; }
-        .hospital-visual::after { width: 500px; height: 500px; }
-        .visual-label { position: absolute; top: 23px; left: 25px; color: #a8c0b7; font-size: 9px; letter-spacing: 1.7px; font-weight: 800; }
-        .visual-center { position: relative; z-index: 2; text-align: center; color: white; }
-        .visual-center span { width: 68px; height: 68px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.09); font-size: 28px; }
-        .visual-center strong { display: block; font-family: var(--font-display); font-size: 34px; font-weight: 500; }
-        .visual-center small { color: #9ab3a8; font-size: 9px; }
-        .city-chip { position: absolute; z-index: 3; padding: 8px 11px; border-radius: 999px; background: rgba(255,255,255,.08); color: #d2e1da; border: 1px solid rgba(255,255,255,.1); font-size: 9px; backdrop-filter: blur(8px); }
-        .chip-one { top: 24%; left: 14%; } .chip-two { top: 31%; right: 12%; } .chip-three { bottom: 22%; left: 17%; } .chip-four { bottom: 15%; right: 17%; }
-        .feature-list { display: grid; gap: 11px; margin: 25px 0 30px; color: #63716a; font-size: 11px; }
-        .feature-list span { padding-bottom: 11px; border-bottom: 1px solid #dfe5e0; }
+        .procedure-meta {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          margin-top: 28px;
+          color: #829089;
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
 
-        .journey-section { background: white; }
-        .journey-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
-        .journey-card { min-height: 190px; padding: 22px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-        .journey-card > span { color: var(--gold); font-size: 10px; font-weight: 800; }
-        .journey-card h3 { margin: 38px 0 8px; font-family: var(--font-display); font-size: 23px; font-weight: 500; }
-        .journey-card p { color: #77827c; font-size: 10px; line-height: 1.6; margin: 0; }
-        .journey-cta { margin-top: 25px; padding: 25px 28px; background: #edf2ed; border-radius: 17px; display: flex; justify-content: space-between; align-items: center; gap: 25px; }
-        .journey-cta span { color: #738078; font-size: 8px; letter-spacing: 1.5px; font-weight: 800; }
-        .journey-cta h3 { margin: 7px 0 0; font-family: var(--font-display); font-size: 24px; font-weight: 500; }
+        .procedure-card h3 {
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 28px;
+          line-height: 1;
+          letter-spacing: -0.7px;
+          font-weight: 500;
+          margin: 9px 0;
+        }
 
-        .partner-section { background: #173e35; color: white; }
-        .partner-card { display: grid; grid-template-columns: 1fr 1fr; gap: 90px; align-items: center; }
-        .partner-card h2 { font-size: 57px; }
-        .partner-card h2 em { color: #c4ded0; }
-        .partner-card p { color: #aec4ba; font-size: 13px; line-height: 1.8; margin-bottom: 25px; }
-        .light-link { color: white; font-size: 11px; font-weight: 800; }
-        .light-link span { color: #b7d7c6; margin-left: 7px; }
+        .procedure-card > p {
+          min-height: 60px;
+          color: #78837e;
+          font-size: 11px;
+          line-height: 1.65;
+        }
 
-        .faq-section { background: #f7f8f5; }
-        .faq-layout { display: grid; grid-template-columns: .85fr 1.15fr; gap: 110px; }
-        .faq-layout > div > p { margin-top: 22px; max-width: 430px; }
-        .faq-list { border-top: 1px solid var(--line); }
-        .faq-item { border-bottom: 1px solid var(--line); }
-        .faq-item button { width: 100%; display: flex; justify-content: space-between; gap: 20px; align-items: center; border: 0; background: transparent; padding: 19px 0; cursor: pointer; color: var(--ink); text-align: left; font-size: 12px; font-weight: 700; }
-        .faq-item button b { font-size: 18px; font-weight: 400; color: #617069; }
-        .faq-item p { margin: -3px 40px 19px 0; color: #748079; font-size: 11px; line-height: 1.75; }
+        .cost-mini {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-top: 17px;
+        }
 
-        .review-section { padding: 75px 0; background: #102f28; color: white; }
-        .review-card { display: grid; grid-template-columns: 1fr .8fr; gap: 90px; align-items: center; }
-        .review-card h2 { font-size: 59px; margin-top: 13px; }
-        .review-card p { max-width: 550px; color: #a9c0b6; font-size: 13px; line-height: 1.8; }
-        .review-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 11px; }
-        .review-actions a { color: #a9c0b6; font-size: 10px; }
-        .review-actions a:hover { color: white; }
+        .cost-mini div {
+          background: #f1f4f1;
+          padding: 10px;
+          border-radius: 10px;
+        }
 
-        .footer { background: #0b241f; color: #b5c5bf; padding: 65px 0 25px; }
-        .footer-grid { display: grid; grid-template-columns: 1.5fr .8fr .8fr .8fr; gap: 55px; }
-        .footer-brand { display: flex; align-items: center; gap: 10px; color: white; margin-bottom: 17px; }
-        .footer-brand strong { font-size: 22px; letter-spacing: -.7px; }
-        .footer-grid > div:first-child p { max-width: 310px; color: #71877f; font-size: 10px; line-height: 1.8; }
-        .footer-heading { display: block; color: #7e978d; font-size: 8px; letter-spacing: 1.6px; font-weight: 800; text-transform: uppercase; margin-bottom: 14px; }
-        .footer-grid a, .footer-grid button { display: block; border: 0; padding: 0; background: transparent; color: #b5c5bf; margin: 0 0 10px; font-size: 10px; cursor: pointer; text-align: left; }
-        .footer-grid a:hover, .footer-grid button:hover { color: white; }
-        .footer-bottom { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid rgba(255,255,255,.08); margin-top: 45px; padding-top: 18px; color: #637a72; font-size: 8px; line-height: 1.5; }
+        .cost-mini span {
+          display: block;
+          color: #8b958f;
+          font-size: 8px;
+          line-height: 1.35;
+          margin-bottom: 4px;
+        }
 
-        .floating-assistant { position: fixed; z-index: 40; right: 22px; bottom: 22px; border: 1px solid rgba(255,255,255,.15); background: var(--green); color: white; box-shadow: 0 16px 30px rgba(15,43,36,.24); border-radius: 999px; padding: 12px 16px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        .floating-assistant span { color: #d5b66f; }
-        .floating-assistant b { font-size: 10px; }
-        .mobile-review-bar { display: none; }
+        .cost-mini strong {
+          display: block;
+          color: #27483e;
+          font-size: 10px;
+          line-height: 1.35;
+        }
+
+        .card-link {
+          position: absolute;
+          left: 22px;
+          right: 22px;
+          bottom: 18px;
+          border-top: 1px solid #e3e8e4;
+          padding-top: 13px;
+          color: var(--green);
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .card-link span {
+          float: right;
+        }
+
+        .treatment-state {
+          min-height: 250px;
+          border: 1px dashed #d7e0da;
+          border-radius: 20px;
+          background: #f9fbf9;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 35px;
+          gap: 9px;
+          color: #69766f;
+        }
+
+        .treatment-state strong {
+          color: var(--green);
+          font-size: 17px;
+        }
+
+        .treatment-state span {
+          max-width: 500px;
+          font-size: 11px;
+          line-height: 1.7;
+        }
+
+        .treatment-state a,
+        .treatment-state button {
+          margin-top: 7px;
+          border: 0;
+          background: transparent;
+          color: var(--green);
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .error-state strong {
+          color: #7b463d;
+        }
+
+        .spinner {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          border: 3px solid #dfe9e2;
+          border-top-color: var(--green);
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        .treatment-directory-cta {
+          margin-top: 24px;
+          padding: 18px 20px;
+          border: 1px solid #dfe6e1;
+          border-radius: 17px;
+          background: #f3f7f3;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+        }
+
+        .treatment-directory-cta > div {
+          display: grid;
+          gap: 5px;
+        }
+
+        .treatment-directory-cta span {
+          color: #7c8982;
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 1.4px;
+        }
+
+        .treatment-directory-cta strong {
+          color: var(--green);
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 22px;
+          font-weight: 500;
+        }
+
+        .cost-section {
+          background: #eef2ee;
+        }
+
+        .cost-card {
+          display: grid;
+          grid-template-columns: 0.78fr 1.22fr;
+          overflow: hidden;
+          border-radius: 27px;
+          background: var(--green);
+          color: white;
+          box-shadow: 0 25px 55px rgba(23, 54, 46, 0.14);
+        }
+
+        .cost-copy {
+          padding: 54px;
+        }
+
+        .cost-copy h2 {
+          font-size: 55px;
+        }
+
+        .cost-copy h2 em {
+          color: #c7dfd1;
+        }
+
+        .cost-copy p {
+          max-width: 440px;
+          color: #b8cbc2;
+          font-size: 13px;
+          line-height: 1.8;
+          margin: 23px 0 28px;
+        }
+
+        .light-button {
+          background: white;
+          color: var(--green);
+        }
+
+        .light-button span {
+          color: var(--green-2);
+        }
+
+        .cost-visual {
+          padding: 37px;
+          background: #102f28;
+        }
+
+        .cost-header {
+          display: flex;
+          justify-content: space-between;
+          color: #87a399;
+          font-size: 9px;
+          letter-spacing: 1.6px;
+          font-weight: 800;
+          padding-bottom: 20px;
+        }
+
+        .cost-row {
+          display: grid;
+          grid-template-columns: 1.05fr 1fr 0.85fr;
+          gap: 18px;
+          align-items: center;
+          padding: 18px 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.09);
+        }
+
+        .cost-label strong {
+          display: block;
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 19px;
+          font-weight: 500;
+        }
+
+        .cost-label span {
+          display: block;
+          color: #809b90;
+          font-size: 8px;
+          margin-top: 4px;
+        }
+
+        .cost-bars {
+          display: grid;
+          gap: 6px;
+        }
+
+        .cost-bars > div {
+          height: 6px;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.08);
+          overflow: hidden;
+        }
+
+        .cost-bars i {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+          background: #a8cdb9;
+        }
+
+        .cost-values {
+          text-align: right;
+        }
+
+        .cost-values strong {
+          display: block;
+          color: #d7e7df;
+          font-size: 9px;
+          line-height: 1.45;
+        }
+
+        .cost-empty {
+          padding: 30px 0;
+          color: #8ca59a;
+          font-size: 11px;
+          line-height: 1.7;
+        }
+
+        .cost-note {
+          margin-top: 20px;
+          color: #718d82;
+          font-size: 8px;
+          line-height: 1.6;
+        }
+
+        .directory-preview {
+          background: white;
+        }
+
+        .directory-grid {
+          display: grid;
+          grid-template-columns: 0.9fr 1.1fr;
+          gap: 100px;
+          align-items: center;
+        }
+
+        .directory-intro h2 {
+          margin-bottom: 24px;
+        }
+
+        .text-button {
+          border: 0;
+          background: transparent;
+          padding: 0;
+          color: #6d7973;
+          cursor: pointer;
+          font-size: 11px;
+          text-align: left;
+        }
+
+        .text-button span {
+          color: var(--green);
+          font-weight: 800;
+          margin-left: 5px;
+        }
+
+        .directory-placeholder {
+          border: 1px solid #dfe5e1;
+          border-radius: 23px;
+          background: #f7f9f7;
+          padding: 24px;
+          transition:
+            transform 0.25s ease,
+            box-shadow 0.25s ease;
+        }
+
+        .directory-clickable:hover,
+        .hospital-clickable:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 40px rgba(27, 57, 47, 0.09);
+        }
+
+        .directory-placeholder-top {
+          display: flex;
+          justify-content: space-between;
+          color: #718079;
+          font-size: 9px;
+          letter-spacing: 1.5px;
+          font-weight: 800;
+          padding-bottom: 17px;
+          border-bottom: 1px solid #e2e7e3;
+        }
+
+        .status-pill {
+          border-radius: 999px;
+          padding: 6px 9px;
+          background: #e3eee7;
+          color: #346051;
+          letter-spacing: 0.7px;
+        }
+
+        .placeholder-lines {
+          display: grid;
+          gap: 0;
+        }
+
+        .placeholder-lines > div {
+          display: grid;
+          grid-template-columns: 40px 1fr;
+          gap: 3px 13px;
+          align-items: center;
+          padding: 19px 0;
+          border-bottom: 1px solid #e3e8e4;
+        }
+
+        .avatar-placeholder {
+          grid-row: span 2;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          background: #dce8df;
+          color: #557467;
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        .placeholder-lines b {
+          font-size: 12px;
+        }
+
+        .placeholder-lines small {
+          color: #89948e;
+          font-size: 9px;
+        }
+
+        .placeholder-footer {
+          color: #8a958f;
+          font-size: 9px;
+          margin-top: 17px;
+        }
+
+        .hospital-section {
+          background: #f1f4f1;
+        }
+
+        .hospital-layout {
+          display: grid;
+          grid-template-columns: 1.05fr 0.95fr;
+          gap: 100px;
+          align-items: center;
+        }
+
+        .hospital-visual {
+          min-height: 470px;
+          border-radius: 27px;
+          background: radial-gradient(
+            circle at center,
+            #345e51 0%,
+            #173d34 43%,
+            #0f2e27 100%
+          );
+          position: relative;
+          overflow: hidden;
+          display: grid;
+          place-items: center;
+          box-shadow: 0 25px 55px rgba(22, 62, 53, 0.15);
+          transition:
+            transform 0.25s ease,
+            box-shadow 0.25s ease;
+        }
+
+        .hospital-visual::before,
+        .hospital-visual::after {
+          content: "";
+          position: absolute;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 50%;
+        }
+
+        .hospital-visual::before {
+          width: 330px;
+          height: 330px;
+        }
+
+        .hospital-visual::after {
+          width: 500px;
+          height: 500px;
+        }
+
+        .visual-label {
+          position: absolute;
+          top: 23px;
+          left: 25px;
+          color: #a8c0b7;
+          font-size: 9px;
+          letter-spacing: 1.7px;
+          font-weight: 800;
+        }
+
+        .visual-center {
+          position: relative;
+          z-index: 2;
+          text-align: center;
+          color: white;
+        }
+
+        .visual-center span {
+          width: 68px;
+          height: 68px;
+          margin: 0 auto 15px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.09);
+          font-size: 28px;
+        }
+
+        .visual-center strong {
+          display: block;
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 34px;
+          font-weight: 500;
+        }
+
+        .visual-center small {
+          color: #9ab3a8;
+          font-size: 9px;
+        }
+
+        .city-chip {
+          position: absolute;
+          z-index: 3;
+          padding: 8px 11px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.08);
+          color: #d2e1da;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          font-size: 9px;
+          backdrop-filter: blur(8px);
+        }
+
+        .chip-one {
+          top: 24%;
+          left: 14%;
+        }
+
+        .chip-two {
+          top: 31%;
+          right: 12%;
+        }
+
+        .chip-three {
+          bottom: 22%;
+          left: 17%;
+        }
+
+        .chip-four {
+          bottom: 15%;
+          right: 17%;
+        }
+
+        .feature-list {
+          display: grid;
+          gap: 11px;
+          margin: 25px 0 30px;
+          color: #63716a;
+          font-size: 11px;
+        }
+
+        .feature-list span {
+          padding-bottom: 11px;
+          border-bottom: 1px solid #dfe5e0;
+        }
+
+        .journey-section {
+          background: white;
+        }
+
+        .journey-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          border-top: 1px solid var(--line);
+          border-left: 1px solid var(--line);
+        }
+
+        .journey-card {
+          min-height: 190px;
+          padding: 22px;
+          border-right: 1px solid var(--line);
+          border-bottom: 1px solid var(--line);
+        }
+
+        .journey-card > span {
+          color: var(--gold);
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .journey-card h3 {
+          margin: 38px 0 8px;
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 23px;
+          font-weight: 500;
+        }
+
+        .journey-card p {
+          color: #77827c;
+          font-size: 10px;
+          line-height: 1.6;
+          margin: 0;
+        }
+
+        .journey-cta {
+          margin-top: 25px;
+          padding: 25px 28px;
+          background: #edf2ed;
+          border-radius: 17px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 25px;
+        }
+
+        .journey-cta span {
+          color: #738078;
+          font-size: 8px;
+          letter-spacing: 1.5px;
+          font-weight: 800;
+        }
+
+        .journey-cta h3 {
+          margin: 7px 0 0;
+          font-family: ${displayFont.style.fontFamily};
+          font-size: 24px;
+          font-weight: 500;
+        }
+
+        .partner-section {
+          background: #173e35;
+          color: white;
+        }
+
+        .partner-card {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 90px;
+          align-items: center;
+        }
+
+        .partner-card h2 {
+          font-size: 57px;
+        }
+
+        .partner-card h2 em {
+          color: #c4ded0;
+        }
+
+        .partner-card p {
+          color: #aec4ba;
+          font-size: 13px;
+          line-height: 1.8;
+          margin-bottom: 25px;
+        }
+
+        .light-link {
+          color: white;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .light-link span {
+          color: #b7d7c6;
+          margin-left: 7px;
+        }
+
+        .faq-section {
+          background: #f7f8f5;
+        }
+
+        .faq-layout {
+          display: grid;
+          grid-template-columns: 0.85fr 1.15fr;
+          gap: 110px;
+        }
+
+        .faq-layout > div > p {
+          margin-top: 22px;
+          max-width: 430px;
+        }
+
+        .faq-list {
+          border-top: 1px solid var(--line);
+        }
+
+        .faq-item {
+          border-bottom: 1px solid var(--line);
+        }
+
+        .faq-item button {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+          align-items: center;
+          border: 0;
+          background: transparent;
+          padding: 19px 0;
+          cursor: pointer;
+          color: var(--ink);
+          text-align: left;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .faq-item button b {
+          font-size: 18px;
+          font-weight: 400;
+          color: #617069;
+        }
+
+        .faq-item p {
+          margin: -3px 40px 19px 0;
+          color: #748079;
+          font-size: 11px;
+          line-height: 1.75;
+        }
+
+        .review-section {
+          padding: 75px 0;
+          background: #102f28;
+          color: white;
+        }
+
+        .review-card {
+          display: grid;
+          grid-template-columns: 1fr 0.8fr;
+          gap: 90px;
+          align-items: center;
+        }
+
+        .review-card h2 {
+          font-size: 59px;
+          margin-top: 13px;
+        }
+
+        .review-card p {
+          max-width: 550px;
+          color: #a9c0b6;
+          font-size: 13px;
+          line-height: 1.8;
+        }
+
+        .review-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 11px;
+        }
+
+        .review-actions a {
+          color: #a9c0b6;
+          font-size: 10px;
+        }
+
+        .review-actions a:hover {
+          color: white;
+        }
+
+        .footer {
+          background: #0b241f;
+          color: #b5c5bf;
+          padding: 65px 0 25px;
+        }
+
+        .footer-grid {
+          display: grid;
+          grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr;
+          gap: 55px;
+        }
+
+        .footer-brand {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: white;
+          margin-bottom: 17px;
+        }
+
+        .footer-brand strong {
+          font-size: 22px;
+          letter-spacing: -0.7px;
+        }
+
+        .footer-grid > div:first-child p {
+          max-width: 310px;
+          color: #71877f;
+          font-size: 10px;
+          line-height: 1.8;
+        }
+
+        .footer-heading {
+          display: block;
+          color: #7e978d;
+          font-size: 8px;
+          letter-spacing: 1.6px;
+          font-weight: 800;
+          text-transform: uppercase;
+          margin-bottom: 14px;
+        }
+
+        .footer-grid a,
+        .footer-grid button {
+          display: block;
+          border: 0;
+          padding: 0;
+          background: transparent;
+          color: #b5c5bf;
+          margin: 0 0 10px;
+          font-size: 10px;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .footer-grid a:hover,
+        .footer-grid button:hover {
+          color: white;
+        }
+
+        .footer-bottom {
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          margin-top: 45px;
+          padding-top: 18px;
+          color: #637a72;
+          font-size: 8px;
+          line-height: 1.5;
+        }
+
+        .floating-assistant {
+          position: fixed;
+          z-index: 40;
+          right: 22px;
+          bottom: 22px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: var(--green);
+          color: white;
+          box-shadow: 0 16px 30px rgba(15, 43, 36, 0.24);
+          border-radius: 999px;
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+        }
+
+        .floating-assistant span {
+          color: #d5b66f;
+        }
+
+        .floating-assistant b {
+          font-size: 10px;
+        }
+
+        .mobile-review-bar {
+          display: none;
+        }
 
         @media (max-width: 1050px) {
-          .desktop-nav { gap: 14px; }
-          .desktop-nav a { font-size: 11px; }
-          .hero-grid { gap: 40px; }
-          .hero h1 { font-size: 65px; }
-          .section-heading, .directory-grid, .hospital-layout, .faq-layout, .partner-card, .review-card { gap: 55px; }
-          .cost-card { grid-template-columns: 1fr; }
-          .cost-copy { padding-bottom: 40px; }
+          .desktop-nav {
+            gap: 14px;
+          }
+
+          .desktop-nav a {
+            font-size: 11px;
+          }
+
+          .hero-grid {
+            gap: 40px;
+          }
+
+          .hero h1 {
+            font-size: 65px;
+          }
+
+          .section-heading,
+          .directory-grid,
+          .hospital-layout,
+          .faq-layout,
+          .partner-card,
+          .review-card {
+            gap: 55px;
+          }
+
+          .cost-card {
+            grid-template-columns: 1fr;
+          }
+
+          .cost-copy {
+            padding-bottom: 40px;
+          }
         }
 
         @media (max-width: 820px) {
-          .container { width: min(100% - 32px, 650px); }
-          .header-inner { min-height: 68px; }
+          .container {
+            width: min(100% - 32px, 650px);
+          }
+
+          .header-inner {
+            min-height: 68px;
+          }
+
           .desktop-nav {
             display: none;
             position: absolute;
@@ -1195,78 +3096,302 @@ export default function MedicalNeedsPage() {
             right: 16px;
             margin: 0;
             padding: 14px;
-            background: rgba(255,255,255,.97);
+            background: rgba(255, 255, 255, 0.97);
             border: 1px solid var(--line);
             border-radius: 17px;
-            box-shadow: 0 20px 40px rgba(24,45,37,.1);
+            box-shadow: 0 20px 40px rgba(24, 45, 37, 0.1);
           }
-          .desktop-nav.mobile-open { display: grid; }
-          .desktop-nav a { padding: 12px; font-size: 12px; }
-          .menu-toggle { display: block; }
-          .header-review { display: none; }
 
-          .hero { padding: 65px 0 55px; }
-          .hero-grid, .two-col, .section-heading, .directory-grid, .hospital-layout, .faq-layout, .partner-card, .review-card { grid-template-columns: 1fr; }
-          .hero-grid { gap: 40px; }
-          .hero h1 { font-size: clamp(48px, 12vw, 68px); letter-spacing: -2.7px; }
-          .hero-lead { font-size: 15px; }
-          .hero-panel { min-height: 440px; }
-          .panel-main { padding: 75px 22px 45px; }
-          .panel-main h2 { font-size: 39px; }
-          .discovery-grid { grid-template-columns: 1fr 1fr; }
-          .discovery-card:nth-child(2) { border-right: 0; }
-          .discovery-card:nth-child(n+3) { border-top: 1px solid var(--line); }
-          .section { padding: 78px 0; }
-          .procedure-grid { grid-template-columns: 1fr 1fr; }
-          .journey-grid { grid-template-columns: 1fr 1fr; }
-          .partner-card h2, .review-card h2 { font-size: 49px; }
-          .directory-grid, .hospital-layout { gap: 38px; }
-          .hospital-visual { min-height: 390px; }
-          .footer-grid { grid-template-columns: 1fr 1fr; }
+          .desktop-nav.mobile-open {
+            display: grid;
+          }
+
+          .desktop-nav a {
+            padding: 12px;
+            font-size: 12px;
+          }
+
+          .menu-toggle {
+            display: block;
+          }
+
+          .header-review {
+            display: none;
+          }
+
+          .hero {
+            padding: 65px 0 55px;
+          }
+
+          .hero-grid,
+          .two-col,
+          .section-heading,
+          .directory-grid,
+          .hospital-layout,
+          .faq-layout,
+          .partner-card,
+          .review-card {
+            grid-template-columns: 1fr;
+          }
+
+          .hero-grid {
+            gap: 40px;
+          }
+
+          .hero h1 {
+            font-size: clamp(48px, 12vw, 68px);
+            letter-spacing: -2.7px;
+          }
+
+          .hero-lead {
+            font-size: 15px;
+          }
+
+          .hero-panel {
+            min-height: 440px;
+          }
+
+          .panel-main {
+            padding: 75px 22px 45px;
+          }
+
+          .panel-main h2 {
+            font-size: 39px;
+          }
+
+          .discovery-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .discovery-card:nth-child(2) {
+            border-right: 0;
+          }
+
+          .discovery-card:nth-child(n + 3) {
+            border-top: 1px solid var(--line);
+          }
+
+          .section {
+            padding: 78px 0;
+          }
+
+          .procedure-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .journey-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .partner-card h2,
+          .review-card h2 {
+            font-size: 49px;
+          }
+
+          .directory-grid,
+          .hospital-layout {
+            gap: 38px;
+          }
+
+          .hospital-visual {
+            min-height: 390px;
+          }
+
+          .footer-grid {
+            grid-template-columns: 1fr 1fr;
+          }
         }
 
         @media (max-width: 560px) {
-          .container { width: calc(100% - 28px); }
-          .brand-copy small { letter-spacing: 1.5px; }
-          .hero { padding-top: 47px; }
-          .hero h1 { font-size: 48px; }
-          .hero-lead { font-size: 14px; }
-          .search-row { min-height: 58px; padding-left: 13px; }
-          .search-row button { padding: 11px 13px; }
-          .search-row input { font-size: 12px; }
-          .search-results { top: 66px; }
-          .popular-searches { gap: 6px; }
-          .popular-searches button { font-size: 9px; }
-          .hero-actions { flex-direction: column; }
-          .hero-actions .button { width: 100%; }
-          .trust-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; line-height: 1.5; }
-          .hero-panel { min-height: 425px; border-radius: 21px; padding: 17px; }
-          .panel-main { padding: 64px 8px 35px; }
-          .panel-main h2 { font-size: 37px; }
-          .panel-path div { grid-template-columns: 30px 1fr; }
-          .panel-path small { grid-column: 2; }
-          .discovery-grid { grid-template-columns: 1fr; }
-          .discovery-card, .discovery-card:first-child { border-left: 0; border-right: 0; border-top: 1px solid var(--line); }
-          .discovery-card:first-child { border-top: 0; }
-          h2 { font-size: 43px; }
-          .section-heading { gap: 17px; }
-          .procedure-grid { grid-template-columns: 1fr; }
-          .procedure-card { min-height: 325px; }
-          .cost-copy { padding: 34px 24px; }
-          .cost-copy h2 { font-size: 44px; }
-          .cost-visual { padding: 22px 18px; }
-          .cost-row { grid-template-columns: 1fr; gap: 9px; }
-          .cost-values { text-align: left; display: flex; gap: 12px; }
-          .cost-values span { margin-top: 0; }
-          .journey-grid { grid-template-columns: 1fr; }
-          .journey-card { min-height: auto; padding: 19px; }
-          .journey-card h3 { margin-top: 20px; }
-          .journey-cta { flex-direction: column; align-items: flex-start; }
-          .partner-card h2, .review-card h2 { font-size: 43px; }
-          .footer-grid { grid-template-columns: 1fr 1fr; gap: 35px 20px; }
-          .footer-grid > div:first-child { grid-column: 1 / -1; }
-          .footer-bottom { flex-direction: column; }
-          .floating-assistant { right: 14px; bottom: 72px; padding: 10px 13px; }
+          .container {
+            width: calc(100% - 28px);
+          }
+
+          .brand-copy small {
+            letter-spacing: 1.5px;
+          }
+
+          .hero {
+            padding-top: 47px;
+          }
+
+          .hero h1 {
+            font-size: 48px;
+          }
+
+          .hero-lead {
+            font-size: 14px;
+          }
+
+          .search-row {
+            min-height: 58px;
+            padding-left: 13px;
+          }
+
+          .search-row button {
+            padding: 11px 13px;
+          }
+
+          .search-row input {
+            font-size: 12px;
+          }
+
+          .search-results {
+            top: 66px;
+          }
+
+          .popular-searches {
+            gap: 6px;
+          }
+
+          .popular-searches button {
+            font-size: 9px;
+          }
+
+          .hero-actions {
+            flex-direction: column;
+          }
+
+          .hero-actions .button {
+            width: 100%;
+          }
+
+          .trust-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            line-height: 1.5;
+          }
+
+          .hero-panel {
+            min-height: 425px;
+            border-radius: 21px;
+            padding: 17px;
+          }
+
+          .panel-main {
+            padding: 64px 8px 35px;
+          }
+
+          .panel-main h2 {
+            font-size: 37px;
+          }
+
+          .panel-path div {
+            grid-template-columns: 30px 1fr;
+          }
+
+          .panel-path small {
+            grid-column: 2;
+          }
+
+          .discovery-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .discovery-card,
+          .discovery-card:first-child {
+            border-left: 0;
+            border-right: 0;
+            border-top: 1px solid var(--line);
+          }
+
+          .discovery-card:first-child {
+            border-top: 0;
+          }
+
+          h2 {
+            font-size: 43px;
+          }
+
+          .section-heading {
+            gap: 17px;
+          }
+
+          .procedure-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .procedure-card {
+            min-height: 325px;
+          }
+
+          .cost-mini {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .treatment-directory-cta {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .treatment-directory-cta .button {
+            width: 100%;
+          }
+
+          .cost-copy {
+            padding: 34px 24px;
+          }
+
+          .cost-copy h2 {
+            font-size: 44px;
+          }
+
+          .cost-visual {
+            padding: 22px 18px;
+          }
+
+          .cost-row {
+            grid-template-columns: 1fr;
+            gap: 9px;
+          }
+
+          .cost-values {
+            text-align: left;
+          }
+
+          .journey-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .journey-card {
+            min-height: auto;
+            padding: 19px;
+          }
+
+          .journey-card h3 {
+            margin-top: 20px;
+          }
+
+          .journey-cta {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .partner-card h2,
+          .review-card h2 {
+            font-size: 43px;
+          }
+
+          .footer-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 35px 20px;
+          }
+
+          .footer-grid > div:first-child {
+            grid-column: 1 / -1;
+          }
+
+          .footer-bottom {
+            flex-direction: column;
+          }
+
+          .floating-assistant {
+            right: 14px;
+            bottom: 72px;
+            padding: 10px 13px;
+          }
+
           .mobile-review-bar {
             position: fixed;
             z-index: 45;
@@ -1275,10 +3400,11 @@ export default function MedicalNeedsPage() {
             bottom: 0;
             display: block;
             padding: 9px 12px;
-            background: rgba(247,248,245,.94);
+            background: rgba(247, 248, 245, 0.94);
             backdrop-filter: blur(14px);
             border-top: 1px solid var(--line);
           }
+
           .mobile-review-bar button {
             width: 100%;
             min-height: 45px;
@@ -1289,7 +3415,11 @@ export default function MedicalNeedsPage() {
             font-size: 11px;
             font-weight: 800;
           }
-          .mobile-review-bar span { margin-left: 8px; color: #c6dfd1; }
+
+          .mobile-review-bar span {
+            margin-left: 8px;
+            color: #c6dfd1;
+          }
         }
       `}</style>
     </main>
