@@ -1,1262 +1,999 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Newsreader, Public_Sans } from "next/font/google"
-import { getSupabaseBrowserClient } from "../../../lib/supabase-browser"
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Newsreader, Public_Sans } from "next/font/google";
+import { getSupabaseBrowserClient } from "../../../lib/supabase-browser";
 
-const displayFont = Newsreader({
+const newsreader = Newsreader({
   subsets: ["latin"],
-  variable: "--font-display",
-})
+  variable: "--font-newsreader",
+});
 
-const bodyFont = Public_Sans({
+const publicSans = Public_Sans({
   subsets: ["latin"],
-  variable: "--font-body",
-})
+  variable: "--font-public-sans",
+});
 
-function money(value, currency = "INR") {
-  if (value === null || value === undefined || value === "") {
-    return "—"
+const USD_RATE = 97;
+
+function formatUSD(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "—";
   }
 
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Number(value))
+  return `$${Math.round(Number(value) / USD_RATE).toLocaleString("en-US")}`;
 }
 
-function formatArray(items) {
-  if (!Array.isArray(items)) return ""
-  return items.join(" ")
+function formatUSDRange(min, max) {
+  if (
+    min === null ||
+    min === undefined ||
+    max === null ||
+    max === undefined
+  ) {
+    return "Cost on request";
+  }
+
+  return `${formatUSD(min)} – ${formatUSD(max)}`;
+}
+
+function normalizeArray(value) {
+  if (Array.isArray(value)) return value;
+
+  if (!value) return [];
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
 }
 
 export default function TreatmentsDirectoryPage() {
-  const supabase = getSupabaseBrowserClient()
+  const supabase = getSupabaseBrowserClient();
 
-  const [treatments, setTreatments] = useState([])
+  const [treatments, setTreatments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const [query, setQuery] = useState("")
-  const [specialty, setSpecialty] = useState("All specialties")
-  const [category, setCategory] = useState("All categories")
-  const [sort, setSort] = useState("featured")
+  const [search, setSearch] = useState("");
+  const [specialtyFilter, setSpecialtyFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("featured");
+  const [page, setPage] = useState(1);
 
-  const [page, setPage] = useState(1)
-  const pageSize = 12
-
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  const perPage = 12;
 
   useEffect(() => {
-    let active = true
-
     async function loadTreatments() {
-      try {
-        setLoading(true)
-        setError("")
+      setLoading(true);
+      setErrorMessage("");
 
-        const { data, error: dbError } = await supabase
-          .from("medical_treatments")
-          .select("*")
-          .eq("is_published", true)
-          .order("display_order", { ascending: true })
-          .order("featured", { ascending: false })
-          .order("name", { ascending: true })
+      const { data, error } = await supabase
+        .from("medical_treatments")
+        .select("*")
+        .eq("is_published", true)
+        .order("featured", { ascending: false })
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true });
 
-        if (dbError) {
-          throw dbError
-        }
+      if (error) {
+        console.error(error);
+        setErrorMessage(
+          "We could not load treatment information right now."
+        );
+        setTreatments([]);
+      } else {
+        const normalized = (data || []).map((item) => ({
+          ...item,
+          generally_includes: normalizeArray(item.generally_includes),
+          commonly_excluded: normalizeArray(item.commonly_excluded),
+        }));
 
-        if (active) {
-          setTreatments(data || [])
-        }
-      } catch (err) {
-        if (active) {
-          setError(
-            err?.message ||
-              "Unable to load the treatment directory."
-          )
-        }
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
+        setTreatments(normalized);
       }
+
+      setLoading(false);
     }
 
-    loadTreatments()
-
-    return () => {
-      active = false
-    }
-  }, [])
+    loadTreatments();
+  }, [supabase]);
 
   const specialties = useMemo(() => {
-    const values = Array.from(
-      new Set(
-        treatments
-          .map((treatment) => treatment.specialty)
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b))
+    const values = treatments
+      .map((item) => item.specialty)
+      .filter(Boolean)
+      .map((item) => item.trim());
 
-    return ["All specialties", ...values]
-  }, [treatments])
+    return ["All", ...Array.from(new Set(values)).sort()];
+  }, [treatments]);
 
   const categories = useMemo(() => {
-    const values = Array.from(
-      new Set(
-        treatments
-          .map((treatment) => treatment.category)
+    const values = treatments
+      .map((item) => item.category)
+      .filter(Boolean)
+      .map((item) => item.trim());
+
+    return ["All", ...Array.from(new Set(values)).sort()];
+  }, [treatments]);
+
+  const filteredTreatments = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    let result = [...treatments];
+
+    if (specialtyFilter !== "All") {
+      result = result.filter(
+        (item) =>
+          item.specialty?.toLowerCase() === specialtyFilter.toLowerCase()
+      );
+    }
+
+    if (categoryFilter !== "All") {
+      result = result.filter(
+        (item) =>
+          item.category?.toLowerCase() === categoryFilter.toLowerCase()
+      );
+    }
+
+    if (query) {
+      result = result.filter((item) => {
+        const searchable = [
+          item.name,
+          item.specialty,
+          item.category,
+          item.description,
+          item.typical_stay,
+          item.recovery_time,
+          item.international_note,
+          ...(item.generally_includes || []),
+          ...(item.commonly_excluded || []),
+        ]
           .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b))
+          .join(" ")
+          .toLowerCase();
 
-    return ["All categories", ...values]
-  }, [treatments])
+        return searchable.includes(query);
+      });
+    }
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    if (sortBy === "featured") {
+      result.sort((a, b) => {
+        if (Boolean(a.featured) !== Boolean(b.featured)) {
+          return Boolean(b.featured) - Boolean(a.featured);
+        }
 
-    const result = treatments.filter((treatment) => {
-      if (
-        specialty !== "All specialties" &&
-        treatment.specialty !== specialty
-      ) {
-        return false
-      }
+        return (a.name || "").localeCompare(b.name || "");
+      });
+    }
 
-      if (
-        category !== "All categories" &&
-        treatment.category !== category
-      ) {
-        return false
-      }
+    if (sortBy === "name") {
+      result.sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
+      );
+    }
 
-      if (!q) {
-        return true
-      }
-
-      const searchableText = [
-        treatment.name,
-        treatment.specialty,
-        treatment.category,
-        treatment.description,
-        treatment.typical_stay,
-        treatment.recovery_time,
-        treatment.international_note,
-        formatArray(treatment.generally_includes),
-        formatArray(treatment.commonly_excluded),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-
-      return searchableText.includes(q)
-    })
-
-    result.sort((a, b) => {
-      if (sort === "name") {
-        return a.name.localeCompare(b.name)
-      }
-
-      if (sort === "cost-low") {
-        return (
+    if (sortBy === "cost-low") {
+      result.sort(
+        (a, b) =>
           Number(a.india_cost_min || 0) -
           Number(b.india_cost_min || 0)
-        )
-      }
+      );
+    }
 
-      if (sort === "cost-high") {
-        return (
-          Number(b.india_cost_min || 0) -
-          Number(a.india_cost_min || 0)
-        )
-      }
+    if (sortBy === "cost-high") {
+      result.sort(
+        (a, b) =>
+          Number(b.india_cost_max || 0) -
+          Number(a.india_cost_max || 0)
+      );
+    }
 
-      return (
-        Number(b.featured) - Number(a.featured) ||
-        Number(a.display_order || 0) -
-          Number(b.display_order || 0) ||
-        a.name.localeCompare(b.name)
-      )
-    })
-
-    return result
+    return result;
   }, [
     treatments,
-    query,
-    specialty,
-    category,
-    sort,
-  ])
-
-  useEffect(() => {
-    setPage(1)
-  }, [query, specialty, category, sort])
+    search,
+    specialtyFilter,
+    categoryFilter,
+    sortBy,
+  ]);
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filtered.length / pageSize)
-  )
+    Math.ceil(filteredTreatments.length / perPage)
+  );
+
+  const paginatedTreatments = filteredTreatments.slice(
+    (page - 1) * perPage,
+    page * perPage
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, specialtyFilter, categoryFilter, sortBy]);
 
   useEffect(() => {
     if (page > totalPages) {
-      setPage(totalPages)
+      setPage(totalPages);
     }
-  }, [page, totalPages])
+  }, [page, totalPages]);
 
-  const paginatedTreatments = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filtered.slice(start, start + pageSize)
-  }, [filtered, page])
-
-  function clearFilters() {
-    setQuery("")
-    setSpecialty("All specialties")
-    setCategory("All categories")
-    setSort("featured")
-    setPage(1)
+  function resetFilters() {
+    setSearch("");
+    setSpecialtyFilter("All");
+    setCategoryFilter("All");
+    setSortBy("featured");
+    setPage(1);
   }
 
   return (
     <main
-      className={`${displayFont.variable} ${bodyFont.variable} page`}
+      className={`${newsreader.variable} ${publicSans.variable} treatmentDirectory`}
     >
-      <style jsx global>{styles}</style>
+      <style jsx global>{`
+        :root {
+          --td-ink: #17211f;
+          --td-muted: #66726e;
+          --td-green: #164d42;
+          --td-green-2: #236b5c;
+          --td-gold: #b28a43;
+          --td-bg: #f6f8f6;
+          --td-line: #dce4df;
+        }
 
-      {/* NAVIGATION */}
-      <header className="nav">
-        <Link href="/medicalneeds" className="brand">
-          <span className="brandMark">M</span>
-          <span>
-            Medpact <b>Care</b>
-          </span>
-        </Link>
+        * {
+          box-sizing: border-box;
+        }
 
-        <nav>
-          <Link href="/medicalneeds">Medical Needs</Link>
-          <Link href="/medicalneeds/doctors">Doctors</Link>
-          <Link href="/medicalneeds/hospitals">Hospitals</Link>
-          <Link href="/medicalneeds/treatments">
-            Treatments
+        html {
+          scroll-behavior: smooth;
+        }
+
+        body {
+          margin: 0;
+          background: var(--td-bg);
+          color: var(--td-ink);
+          font-family: var(--font-public-sans), sans-serif;
+        }
+
+        a {
+          color: inherit;
+          text-decoration: none;
+        }
+
+        button,
+        input,
+        select {
+          font: inherit;
+        }
+
+        .td-container {
+          width: min(1240px, calc(100% - 48px));
+          margin: 0 auto;
+        }
+
+        .td-nav {
+          position: sticky;
+          top: 0;
+          z-index: 30;
+          border-bottom: 1px solid rgba(220, 228, 223, 0.9);
+          background: rgba(246, 248, 246, 0.94);
+          backdrop-filter: blur(18px);
+        }
+
+        .td-nav-inner {
+          min-height: 76px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+        }
+
+        .td-logo {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-weight: 800;
+          font-size: 21px;
+          letter-spacing: -0.5px;
+        }
+
+        .td-logo-mark {
+          width: 37px;
+          height: 37px;
+          display: grid;
+          place-items: center;
+          border-radius: 11px;
+          background: var(--td-green);
+          color: white;
+          font-size: 19px;
+        }
+
+        .td-nav-links {
+          display: flex;
+          align-items: center;
+          gap: 26px;
+          color: #4e5b56;
+          font-size: 13px;
+        }
+
+        .td-nav-links a:hover {
+          color: var(--td-green);
+        }
+
+        .td-nav-cta {
+          border: 0;
+          border-radius: 999px;
+          padding: 11px 17px;
+          background: var(--td-green);
+          color: white;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .td-hero {
+          padding: 76px 0 52px;
+          background:
+            radial-gradient(
+              circle at 80% 0%,
+              rgba(218, 229, 222, 0.65),
+              transparent 30%
+            ),
+            var(--td-bg);
+        }
+
+        .td-eyebrow {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          margin-bottom: 20px;
+          color: var(--td-gold);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 1.6px;
+          text-transform: uppercase;
+        }
+
+        .td-eyebrow::before {
+          content: "";
+          width: 28px;
+          height: 1px;
+          background: var(--td-gold);
+        }
+
+        .td-hero-grid {
+          display: grid;
+          grid-template-columns: 1fr 0.65fr;
+          gap: 70px;
+          align-items: end;
+        }
+
+        .td-hero h1 {
+          max-width: 800px;
+          margin: 0;
+          font-family: var(--font-newsreader), serif;
+          font-size: clamp(48px, 6vw, 78px);
+          line-height: 0.97;
+          font-weight: 500;
+          letter-spacing: -3px;
+        }
+
+        .td-hero h1 span {
+          color: var(--td-green);
+        }
+
+        .td-hero-copy {
+          max-width: 670px;
+          margin: 23px 0 0;
+          color: var(--td-muted);
+          font-size: 16px;
+          line-height: 1.7;
+        }
+
+        .td-hero-side {
+          padding-left: 28px;
+          border-left: 1px solid var(--td-line);
+        }
+
+        .td-hero-side strong {
+          display: block;
+          margin-bottom: 7px;
+          font-size: 14px;
+        }
+
+        .td-hero-side p {
+          margin: 0;
+          color: var(--td-muted);
+          font-size: 12px;
+          line-height: 1.6;
+        }
+
+        .td-controls {
+          position: sticky;
+          top: 76px;
+          z-index: 20;
+          padding: 17px 0;
+          border-top: 1px solid var(--td-line);
+          border-bottom: 1px solid var(--td-line);
+          background: rgba(246, 248, 246, 0.96);
+          backdrop-filter: blur(15px);
+        }
+
+        .td-controls-grid {
+          display: grid;
+          grid-template-columns: 1.5fr 0.75fr 0.75fr 0.65fr;
+          gap: 9px;
+        }
+
+        .td-input,
+        .td-select {
+          width: 100%;
+          min-height: 45px;
+          border: 1px solid #d5dfda;
+          border-radius: 12px;
+          outline: none;
+          background: white;
+          color: var(--td-ink);
+          padding: 0 14px;
+          font-size: 12px;
+        }
+
+        .td-input:focus,
+        .td-select:focus {
+          border-color: var(--td-green);
+        }
+
+        .td-reset {
+          min-height: 45px;
+          border: 1px solid var(--td-green);
+          border-radius: 12px;
+          background: transparent;
+          color: var(--td-green);
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .td-results-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          margin: 28px 0 20px;
+        }
+
+        .td-results-count {
+          color: var(--td-muted);
+          font-size: 12px;
+        }
+
+        .td-usd-note {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          color: var(--td-green);
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .td-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 17px;
+          padding-bottom: 50px;
+        }
+
+        .td-card {
+          display: flex;
+          flex-direction: column;
+          min-height: 345px;
+          padding: 25px;
+          border: 1px solid var(--td-line);
+          border-radius: 20px;
+          background: white;
+          transition:
+            transform 0.22s ease,
+            box-shadow 0.22s ease;
+        }
+
+        .td-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 22px 45px rgba(25, 57, 48, 0.08);
+        }
+
+        .td-card-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+
+        .td-category {
+          color: var(--td-gold);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+        }
+
+        .td-featured {
+          padding: 5px 8px;
+          border-radius: 999px;
+          background: #edf5ef;
+          color: var(--td-green);
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        .td-card h2 {
+          margin: 0 0 10px;
+          font-family: var(--font-newsreader), serif;
+          font-size: 28px;
+          line-height: 1.04;
+          font-weight: 500;
+        }
+
+        .td-specialty {
+          margin-bottom: 13px;
+          color: #84908b;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .td-description {
+          margin: 0;
+          color: var(--td-muted);
+          font-size: 12px;
+          line-height: 1.6;
+        }
+
+        .td-card-info {
+          display: grid;
+          grid-template-columns: 1.2fr 0.8fr;
+          gap: 9px;
+          margin-top: auto;
+          padding-top: 23px;
+        }
+
+        .td-info-box {
+          padding: 13px;
+          border-radius: 12px;
+          background: #f4f7f4;
+        }
+
+        .td-info-box small {
+          display: block;
+          margin-bottom: 5px;
+          color: #87918d;
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
+        }
+
+        .td-info-box strong {
+          font-size: 13px;
+          line-height: 1.25;
+        }
+
+        .td-card-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          margin-top: 16px;
+          color: var(--td-green);
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .td-empty {
+          grid-column: 1 / -1;
+          padding: 70px 25px;
+          border: 1px dashed #cbd7d1;
+          border-radius: 20px;
+          background: white;
+          text-align: center;
+          color: var(--td-muted);
+        }
+
+        .td-pagination {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 7px;
+          padding: 5px 0 90px;
+        }
+
+        .td-page-button {
+          min-width: 38px;
+          height: 38px;
+          border: 1px solid var(--td-line);
+          border-radius: 10px;
+          background: white;
+          color: #596560;
+          cursor: pointer;
+          font-size: 12px;
+        }
+
+        .td-page-button.active {
+          border-color: var(--td-green);
+          background: var(--td-green);
+          color: white;
+        }
+
+        .td-page-button:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .td-footer-note {
+          padding: 30px 0 100px;
+          border-top: 1px solid var(--td-line);
+          color: #8a9590;
+          font-size: 11px;
+          line-height: 1.7;
+        }
+
+        @media (max-width: 1050px) {
+          .td-hero-grid {
+            grid-template-columns: 1fr;
+            gap: 35px;
+          }
+
+          .td-hero-side {
+            padding-left: 0;
+            padding-top: 20px;
+            border-left: 0;
+            border-top: 1px solid var(--td-line);
+          }
+
+          .td-controls-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .td-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 760px) {
+          .td-nav-links {
+            display: none;
+          }
+
+          .td-hero {
+            padding-top: 48px;
+          }
+
+          .td-controls {
+            top: 66px;
+          }
+
+          .td-controls-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .td-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .td-results-bar {
+            display: block;
+          }
+
+          .td-usd-note {
+            margin-top: 9px;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .td-container {
+            width: min(100% - 30px, 1240px);
+          }
+
+          .td-nav-inner {
+            min-height: 66px;
+          }
+
+          .td-logo {
+            font-size: 19px;
+          }
+
+          .td-nav-cta {
+            padding: 10px 13px;
+            font-size: 11px;
+          }
+
+          .td-hero h1 {
+            font-size: 49px;
+            letter-spacing: -2px;
+          }
+
+          .td-hero-copy {
+            font-size: 14px;
+          }
+
+          .td-card {
+            min-height: 320px;
+          }
+        }
+      `}</style>
+
+      {/* NAV */}
+
+      <header className="td-nav">
+        <div className="td-container td-nav-inner">
+          <Link href="/medicalneeds" className="td-logo">
+            <span className="td-logo-mark">M</span>
+            <span>Medpact</span>
           </Link>
-        </nav>
 
-        <Link
-          href="/medicalneeds#review"
-          className="navCta"
-        >
-          Medical Review <span>↗</span>
-        </Link>
+          <nav className="td-nav-links">
+            <Link href="/medicalneeds">Home</Link>
+            <Link href="/medicalneeds/doctors">Doctors</Link>
+            <Link href="/medicalneeds/hospitals">Hospitals</Link>
+          </nav>
+
+          <Link href="/medicalneeds" className="td-nav-cta">
+            Back to Medpact
+          </Link>
+        </div>
       </header>
 
       {/* HERO */}
-      <section className="hero">
-        <div className="eyebrow">
-          TREATMENT & COST GUIDE
+
+      <section className="td-hero">
+        <div className="td-container td-hero-grid">
+          <div>
+            <div className="td-eyebrow">India treatment directory</div>
+
+            <h1>
+              Understand your treatment
+              <span> before you travel.</span>
+            </h1>
+
+            <p className="td-hero-copy">
+              Explore major medical procedures available in India, with
+              indicative treatment costs, typical stay and recovery
+              information for international patients.
+            </p>
+          </div>
+
+          <div className="td-hero-side">
+            <strong>International patient view</strong>
+
+            <p>
+              All public treatment cost ranges on this page are displayed in
+              USD to make medical-travel planning easier.
+            </p>
+          </div>
         </div>
+      </section>
 
-        <h1>
-          Understand the treatment before you{" "}
-          <em>choose care.</em>
-        </h1>
+      {/* FILTERS */}
 
-        <p>
-          Explore medical procedures, specialties, typical
-          hospital stays and indicative treatment costs in
-          India.
-        </p>
+      <section className="td-controls">
+        <div className="td-container">
+          <div className="td-controls-grid">
+            <input
+              className="td-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search treatment, specialty or procedure..."
+            />
 
-        <div className="searchBox">
-          <span>⌕</span>
-
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search treatment, specialty or procedure…"
-          />
-
-          {query && (
-            <button
-              className="clearSearch"
-              onClick={() => setQuery("")}
-              aria-label="Clear search"
+            <select
+              className="td-select"
+              value={specialtyFilter}
+              onChange={(event) => setSpecialtyFilter(event.target.value)}
             >
-              ×
-            </button>
-          )}
+              {specialties.map((specialty) => (
+                <option key={specialty} value={specialty}>
+                  {specialty === "All"
+                    ? "All specialties"
+                    : specialty}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="td-select"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+            >
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category === "All"
+                    ? "All categories"
+                    : category}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="td-select"
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+            >
+              <option value="featured">Featured</option>
+              <option value="name">Name</option>
+              <option value="cost-low">Cost: Low to High</option>
+              <option value="cost-high">Cost: High to Low</option>
+            </select>
+          </div>
         </div>
       </section>
 
       {/* DIRECTORY */}
-      <section
-        className="directory"
-        id="directory"
-      >
-        {/* TOOLBAR */}
-        <div className="toolbar">
-          <div className="filters">
-            <select
-              value={specialty}
-              onChange={(e) =>
-                setSpecialty(e.target.value)
-              }
-            >
-              {specialties.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
 
-            <select
-              value={category}
-              onChange={(e) =>
-                setCategory(e.target.value)
-              }
-            >
-              {categories.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </div>
-
-          <select
-            value={sort}
-            onChange={(e) =>
-              setSort(e.target.value)
-            }
-          >
-            <option value="featured">
-              Recommended
-            </option>
-
-            <option value="name">
-              Name A–Z
-            </option>
-
-            <option value="cost-low">
-              Cost: Low to High
-            </option>
-
-            <option value="cost-high">
-              Cost: High to Low
-            </option>
-          </select>
-        </div>
-
-        {/* RESULT COUNT */}
-        {!loading && !error && treatments.length > 0 && (
-          <div className="resultBar">
-            <span>
-              Showing{" "}
-              <strong>
-                {filtered.length}
-              </strong>{" "}
-              treatment
-              {filtered.length === 1 ? "" : "s"}
-            </span>
-
-            {(query ||
-              specialty !== "All specialties" ||
-              category !== "All categories") && (
-              <button onClick={clearFilters}>
-                Clear filters
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* LOADING */}
-        {loading && (
-          <div className="state">
-            <div className="spinner" />
-            <h2>
-              Loading treatment directory…
-            </h2>
-            <p>
-              Please wait while we load the latest
-              published treatment information.
-            </p>
-          </div>
-        )}
-
-        {/* ERROR */}
-        {!loading && error && (
-          <div className="state">
-            <div className="stateIcon">!</div>
-
-            <h2>
-              Directory temporarily unavailable
-            </h2>
-
-            <p>{error}</p>
-
-            <button
-              onClick={() =>
-                window.location.reload()
-              }
-            >
-              Try again
-            </button>
-          </div>
-        )}
-
-        {/* EMPTY DATABASE */}
-        {!loading &&
-          !error &&
-          treatments.length === 0 && (
-            <div className="state empty">
-              <div className="orb">✦</div>
-
-              <div className="eyebrow">
-                TREATMENT DIRECTORY
-              </div>
-
-              <h2>
-                Our treatment directory is being
-                curated.
-              </h2>
-
-              <p>
-                Treatment profiles will appear here
-                as the Medpact team publishes them.
-              </p>
-
-              <Link
-                href="/medicalneeds#review"
-                className="primary"
-              >
-                Ask Medpact about a treatment{" "}
-                <span>↗</span>
-              </Link>
+      <section>
+        <div className="td-container">
+          <div className="td-results-bar">
+            <div className="td-results-count">
+              {loading
+                ? "Loading treatments..."
+                : `${filteredTreatments.length} treatment${
+                    filteredTreatments.length === 1 ? "" : "s"
+                  } found`}
             </div>
-          )}
 
-        {/* NO SEARCH RESULTS */}
-        {!loading &&
-          !error &&
-          treatments.length > 0 &&
-          filtered.length === 0 && (
-            <div className="state">
-              <div className="stateIcon">
-                ⌕
-              </div>
-
-              <h2>
-                No matching treatments
-              </h2>
-
-              <p>
-                Try another treatment name,
-                specialty or category.
-              </p>
-
-              <button onClick={clearFilters}>
-                Clear filters
-              </button>
+            <div className="td-usd-note">
+              $ USD · INDICATIVE INDIA COST
             </div>
-          )}
+          </div>
 
-        {/* CARDS */}
-        {!loading &&
-          !error &&
-          paginatedTreatments.length > 0 && (
-            <div className="grid">
-              {paginatedTreatments.map(
-                (treatment) => (
-                  <article
-                    className="card"
-                    key={treatment.id}
-                  >
-                    <div className="cardTop">
-                      <span>
-                        {treatment.category ||
-                          "Treatment"}
-                      </span>
+          {loading ? (
+            <div className="td-grid">
+              <div className="td-empty">
+                Loading treatment information...
+              </div>
+            </div>
+          ) : errorMessage ? (
+            <div className="td-grid">
+              <div className="td-empty">{errorMessage}</div>
+            </div>
+          ) : (
+            <>
+              <div className="td-grid">
+                {paginatedTreatments.length === 0 ? (
+                  <div className="td-empty">
+                    No treatments matched your search.
+                    <br />
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      style={{
+                        marginTop: 16,
+                        border: "1px solid #164d42",
+                        borderRadius: 999,
+                        padding: "10px 16px",
+                        background: "white",
+                        color: "#164d42",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        fontSize: 12,
+                      }}
+                    >
+                      Reset filters
+                    </button>
+                  </div>
+                ) : (
+                  paginatedTreatments.map((treatment) => (
+                    <Link
+                      key={treatment.id}
+                      href={`/medicalneeds/treatments/${treatment.slug}`}
+                      className="td-card"
+                    >
+                      <div className="td-card-top">
+                        <span className="td-category">
+                          {treatment.category ||
+                            treatment.specialty ||
+                            "Treatment"}
+                        </span>
 
-                      {treatment.featured && (
-                        <b>
-                          ★ Featured
-                        </b>
+                        {treatment.featured && (
+                          <span className="td-featured">
+                            FEATURED
+                          </span>
+                        )}
+                      </div>
+
+                      <h2>{treatment.name}</h2>
+
+                      {treatment.specialty && (
+                        <div className="td-specialty">
+                          {treatment.specialty}
+                        </div>
                       )}
-                    </div>
 
-                    <h2>
-                      {treatment.name}
-                    </h2>
+                      <p className="td-description">
+                        {treatment.description ||
+                          "Explore treatment information, recovery and indicative costs in India."}
+                      </p>
 
-                    <p className="specialty">
-                      {treatment.specialty ||
-                        "Specialty information pending"}
-                    </p>
+                      <div className="td-card-info">
+                        <div className="td-info-box">
+                          <small>Estimated cost</small>
 
-                    <p className="summary">
-                      {treatment.description ||
-                        "Treatment information is being curated by the Medpact team."}
-                    </p>
+                          <strong>
+                            {formatUSDRange(
+                              treatment.india_cost_min,
+                              treatment.india_cost_max
+                            )}
+                          </strong>
+                        </div>
 
-                    <div className="metrics">
-                      <div>
-                        <small>
-                          Indicative India
-                          cost
-                        </small>
+                        <div className="td-info-box">
+                          <small>Typical stay</small>
 
-                        <strong>
-                          {treatment.india_cost_min !=
-                            null &&
-                          treatment.india_cost_max !=
-                            null
-                            ? `${money(
-                                treatment.india_cost_min,
-                                treatment.currency ||
-                                  "INR"
-                              )} – ${money(
-                                treatment.india_cost_max,
-                                treatment.currency ||
-                                  "INR"
-                              )}`
-                            : "On request"}
-                        </strong>
+                          <strong>
+                            {treatment.typical_stay || "Varies"}
+                          </strong>
+                        </div>
                       </div>
 
-                      <div>
-                        <small>
-                          Typical stay
-                        </small>
-
-                        <strong>
-                          {treatment.typical_stay ||
-                            "Varies"}
-                        </strong>
+                      <div className="td-card-link">
+                        View treatment <span>→</span>
                       </div>
-                    </div>
-
-                    <div className="cardFooter">
-                      <span>
-                        {treatment.recovery_time
-                          ? `Recovery: ${treatment.recovery_time}`
-                          : "Treatment details"}
-                      </span>
-
-                      <Link
-                        href={`/medicalneeds/treatments/${treatment.slug}`}
-                        className="view"
-                      >
-                        View treatment{" "}
-                        <span>→</span>
-                      </Link>
-                    </div>
-                  </article>
-                )
-              )}
-            </div>
-          )}
-
-        {/* PAGINATION */}
-        {!loading &&
-          !error &&
-          filtered.length > pageSize && (
-            <div className="pagination">
-              <button
-                disabled={page === 1}
-                onClick={() =>
-                  setPage((p) =>
-                    Math.max(1, p - 1)
-                  )
-                }
-              >
-                ← Previous
-              </button>
-
-              <div className="pageNumbers">
-                {Array.from(
-                  { length: totalPages },
-                  (_, index) => index + 1
-                ).map((number) => (
-                  <button
-                    key={number}
-                    className={
-                      number === page
-                        ? "active"
-                        : ""
-                    }
-                    onClick={() =>
-                      setPage(number)
-                    }
-                  >
-                    {number}
-                  </button>
-                ))}
+                    </Link>
+                  ))
+                )}
               </div>
 
-              <button
-                disabled={page === totalPages}
-                onClick={() =>
-                  setPage((p) =>
-                    Math.min(
-                      totalPages,
-                      p + 1
-                    )
-                  )
-                }
-              >
-                Next →
-              </button>
-            </div>
+              {totalPages > 1 && (
+                <div className="td-pagination">
+                  <button
+                    className="td-page-button"
+                    disabled={page === 1}
+                    onClick={() => setPage((current) => current - 1)}
+                  >
+                    ←
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, index) => {
+                    const pageNumber = index + 1;
+
+                    return (
+                      <button
+                        key={pageNumber}
+                        className={`td-page-button ${
+                          page === pageNumber ? "active" : ""
+                        }`}
+                        onClick={() => setPage(pageNumber)}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    className="td-page-button"
+                    disabled={page === totalPages}
+                    onClick={() => setPage((current) => current + 1)}
+                  >
+                    →
+                  </button>
+                </div>
+              )}
+            </>
           )}
-      </section>
 
-      {/* CTA */}
-      <section className="bottomCta">
-        <div>
-          <span className="eyebrow">
-            NEED A PERSONAL ESTIMATE?
-          </span>
-
-          <h2>
-            Let Medpact help you understand the
-            right treatment pathway for your case.
-          </h2>
+          <div className="td-footer-note">
+            <strong>Important:</strong> Treatment costs shown on Medpact are
+            indicative ranges for medical-travel planning only. They are not
+            quotations or guarantees. Actual treatment costs can vary based on
+            diagnosis, procedure complexity, doctor, hospital, medicines,
+            implants, investigations, length of stay and individual clinical
+            requirements.
+          </div>
         </div>
-
-        <Link
-          href="/medicalneeds#review"
-          className="primary"
-        >
-          Start a medical review{" "}
-          <span>↗</span>
-        </Link>
       </section>
-
-      {/* FOOTER */}
-      <footer>
-        <Link
-          href="/medicalneeds"
-          className="brand"
-        >
-          <span className="brandMark">
-            M
-          </span>
-
-          <span>
-            Medpact <b>Care</b>
-          </span>
-        </Link>
-
-        <span>
-          Costs shown are indicative treatment
-          benchmarks in India and are not hospital
-          quotations.
-        </span>
-      </footer>
     </main>
-  )
+  );
 }
-
-const styles = `
-:root{
-  --ink:#12201d;
-  --muted:#687571;
-  --line:#dfe7e3;
-  --paper:#f6f8f5;
-  --accent:#0e7569;
-  --soft:#e8f2ee;
-}
-
-*{
-  box-sizing:border-box;
-}
-
-body{
-  margin:0;
-  background:var(--paper);
-  color:var(--ink);
-  font-family:var(--font-body),Arial,sans-serif;
-}
-
-.nav{
-  height:78px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 clamp(20px,5vw,72px);
-  border-bottom:1px solid var(--line);
-  background:rgba(246,248,245,.94);
-  position:sticky;
-  top:0;
-  z-index:20;
-  backdrop-filter:blur(16px);
-}
-
-.brand{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  color:var(--ink);
-  font-weight:700;
-  text-decoration:none;
-  letter-spacing:-.03em;
-}
-
-.brand b{
-  font-weight:400;
-  color:var(--accent);
-}
-
-.brandMark{
-  width:34px;
-  height:34px;
-  border-radius:11px;
-  background:var(--ink);
-  color:white;
-  display:grid;
-  place-items:center;
-  font-family:var(--font-display);
-  font-size:21px;
-}
-
-.nav nav{
-  display:flex;
-  gap:30px;
-}
-
-.nav nav a{
-  color:#53615d;
-  text-decoration:none;
-  font-size:13px;
-}
-
-.nav nav a:hover{
-  color:var(--accent);
-}
-
-.navCta,
-.primary{
-  background:var(--ink);
-  color:white;
-  text-decoration:none;
-  padding:13px 17px;
-  border-radius:13px;
-  font-size:13px;
-  font-weight:700;
-}
-
-.hero{
-  padding:86px clamp(20px,7vw,100px) 55px;
-  max-width:1250px;
-  margin:auto;
-}
-
-.eyebrow{
-  font-size:11px;
-  letter-spacing:.17em;
-  font-weight:800;
-  color:var(--accent);
-  margin-bottom:18px;
-}
-
-.hero h1{
-  font-family:var(--font-display);
-  font-size:clamp(46px,7vw,84px);
-  font-weight:400;
-  line-height:.92;
-  letter-spacing:-.045em;
-  max-width:850px;
-  margin:0;
-}
-
-.hero h1 em{
-  color:var(--accent);
-  font-style:italic;
-}
-
-.hero>p{
-  font-size:17px;
-  line-height:1.65;
-  color:var(--muted);
-  max-width:720px;
-  margin:28px 0 35px;
-}
-
-.searchBox{
-  height:64px;
-  max-width:780px;
-  border:1px solid #cfdad5;
-  background:white;
-  border-radius:18px;
-  display:flex;
-  align-items:center;
-  padding:0 18px;
-  box-shadow:0 15px 50px rgba(18,32,29,.06);
-}
-
-.searchBox>span{
-  font-size:25px;
-  color:var(--accent);
-}
-
-.searchBox input{
-  border:0;
-  outline:0;
-  flex:1;
-  font:inherit;
-  font-size:15px;
-  padding:0 13px;
-  background:transparent;
-}
-
-.clearSearch{
-  border:0;
-  background:var(--soft);
-  color:var(--accent);
-  width:30px;
-  height:30px;
-  border-radius:50%;
-  cursor:pointer;
-  font-size:20px;
-  line-height:1;
-}
-
-.directory{
-  max-width:1250px;
-  margin:auto;
-  padding:15px clamp(20px,5vw,72px) 90px;
-}
-
-.toolbar{
-  display:flex;
-  gap:20px;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:18px;
-}
-
-.filters{
-  display:flex;
-  gap:10px;
-  overflow:auto;
-}
-
-.toolbar select{
-  border:1px solid var(--line);
-  background:#fff;
-  border-radius:11px;
-  padding:11px 13px;
-  color:#3f4d49;
-  font:inherit;
-  font-size:12px;
-  cursor:pointer;
-}
-
-.resultBar{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:20px;
-  color:#78847f;
-  font-size:12px;
-}
-
-.resultBar strong{
-  color:var(--ink);
-}
-
-.resultBar button{
-  border:0;
-  background:transparent;
-  color:var(--accent);
-  cursor:pointer;
-  font:inherit;
-  font-weight:700;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:18px;
-}
-
-.card{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:22px;
-  padding:25px;
-  min-height:345px;
-  display:flex;
-  flex-direction:column;
-  transition:
-    transform .2s ease,
-    box-shadow .2s ease,
-    border-color .2s ease;
-}
-
-.card:hover{
-  transform:translateY(-3px);
-  border-color:#c5d6d0;
-  box-shadow:0 18px 45px rgba(18,32,29,.07);
-}
-
-.cardTop{
-  display:flex;
-  justify-content:space-between;
-  gap:15px;
-  font-size:10px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  color:#74807c;
-}
-
-.cardTop b{
-  color:var(--accent);
-  white-space:nowrap;
-}
-
-.card h2{
-  font-family:var(--font-display);
-  font-weight:400;
-  font-size:34px;
-  line-height:1.02;
-  margin:16px 0 6px;
-}
-
-.specialty{
-  font-size:12px;
-  color:var(--accent);
-  font-weight:700;
-  margin:0;
-}
-
-.summary{
-  font-size:13px;
-  color:#687571;
-  line-height:1.6;
-  min-height:62px;
-  margin:13px 0 0;
-}
-
-.metrics{
-  display:grid;
-  grid-template-columns:1.4fr .8fr;
-  gap:10px;
-  margin:20px 0;
-}
-
-.metrics>div{
-  background:var(--soft);
-  border-radius:12px;
-  padding:12px;
-}
-
-.metrics small,
-.metrics strong{
-  display:block;
-}
-
-.metrics small{
-  font-size:9px;
-  color:#73817c;
-  text-transform:uppercase;
-  letter-spacing:.06em;
-}
-
-.metrics strong{
-  font-size:12px;
-  margin-top:5px;
-  line-height:1.35;
-}
-
-.cardFooter{
-  margin-top:auto;
-  padding-top:15px;
-  border-top:1px solid var(--line);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:15px;
-}
-
-.cardFooter>span{
-  font-size:10px;
-  color:#7b8782;
-}
-
-.view{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  color:var(--ink);
-  text-decoration:none;
-  font-size:12px;
-  font-weight:700;
-  white-space:nowrap;
-}
-
-.view span{
-  color:var(--accent);
-  font-size:17px;
-}
-
-.state{
-  min-height:360px;
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:24px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  padding:50px;
-}
-
-.state h2{
-  font-family:var(--font-display);
-  font-weight:400;
-  font-size:38px;
-  margin:15px 0 8px;
-}
-
-.state p{
-  max-width:560px;
-  color:var(--muted);
-  line-height:1.65;
-  font-size:14px;
-}
-
-.state button{
-  border:0;
-  background:var(--ink);
-  color:#fff;
-  border-radius:10px;
-  padding:12px 17px;
-  cursor:pointer;
-  font:inherit;
-  font-size:12px;
-  font-weight:700;
-}
-
-.stateIcon{
-  width:54px;
-  height:54px;
-  border-radius:17px;
-  background:var(--soft);
-  color:var(--accent);
-  display:grid;
-  place-items:center;
-  font-size:22px;
-  font-weight:800;
-}
-
-.empty{
-  display:block;
-  padding-top:65px;
-}
-
-.orb{
-  width:62px;
-  height:62px;
-  border-radius:20px;
-  background:var(--soft);
-  color:var(--accent);
-  display:grid;
-  place-items:center;
-  margin:0 auto 25px;
-  font-size:26px;
-}
-
-.empty .eyebrow{
-  margin-bottom:0;
-}
-
-.empty .primary{
-  display:inline-block;
-  margin-top:18px;
-}
-
-.spinner{
-  width:34px;
-  height:34px;
-  border:3px solid #dce6e2;
-  border-top-color:var(--accent);
-  border-radius:50%;
-  animation:spin .8s linear infinite;
-}
-
-@keyframes spin{
-  to{
-    transform:rotate(360deg);
-  }
-}
-
-.pagination{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:12px;
-  margin-top:35px;
-}
-
-.pagination>button{
-  border:1px solid var(--line);
-  background:white;
-  color:var(--ink);
-  border-radius:10px;
-  padding:10px 14px;
-  font:inherit;
-  font-size:12px;
-  font-weight:700;
-  cursor:pointer;
-}
-
-.pagination>button:disabled{
-  opacity:.4;
-  cursor:not-allowed;
-}
-
-.pageNumbers{
-  display:flex;
-  gap:5px;
-}
-
-.pageNumbers button{
-  width:36px;
-  height:36px;
-  border:1px solid var(--line);
-  background:white;
-  border-radius:9px;
-  cursor:pointer;
-  color:var(--ink);
-}
-
-.pageNumbers button.active{
-  background:var(--ink);
-  color:white;
-  border-color:var(--ink);
-}
-
-.bottomCta{
-  max-width:1250px;
-  margin:0 auto 80px;
-  padding:45px clamp(20px,5vw,72px);
-  border-radius:28px;
-  background:#e3eee9;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:30px;
-}
-
-.bottomCta h2{
-  font-family:var(--font-display);
-  font-weight:400;
-  font-size:38px;
-  line-height:1.05;
-  margin:0;
-  max-width:650px;
-}
-
-footer{
-  border-top:1px solid var(--line);
-  padding:25px clamp(20px,5vw,72px);
-  display:flex;
-  justify-content:space-between;
-  gap:20px;
-  align-items:center;
-  color:#7b8581;
-  font-size:10px;
-}
-
-footer .brand{
-  color:var(--ink);
-  font-size:14px;
-}
-
-@media(max-width:900px){
-
-  .nav nav{
-    display:none;
-  }
-
-  .grid{
-    grid-template-columns:1fr;
-  }
-
-  .bottomCta{
-    margin-left:20px;
-    margin-right:20px;
-    flex-direction:column;
-    align-items:flex-start;
-  }
-}
-
-@media(max-width:620px){
-
-  .nav{
-    height:68px;
-  }
-
-  .navCta{
-    font-size:11px;
-    padding:10px 12px;
-  }
-
-  .hero{
-    padding-top:55px;
-  }
-
-  .toolbar{
-    align-items:stretch;
-    flex-direction:column;
-  }
-
-  .filters{
-    width:100%;
-  }
-
-  .filters select{
-    flex:1;
-    min-width:0;
-  }
-
-  .card{
-    min-height:0;
-  }
-
-  .card h2{
-    font-size:29px;
-  }
-
-  .metrics{
-    grid-template-columns:1fr;
-  }
-
-  .cardFooter{
-    align-items:flex-start;
-    flex-direction:column;
-  }
-
-  .bottomCta h2{
-    font-size:32px;
-  }
-
-  .pagination{
-    gap:7px;
-  }
-
-  .pagination>button{
-    padding:9px 10px;
-  }
-
-  .pageNumbers button{
-    width:32px;
-    height:32px;
-  }
-
-  footer{
-    flex-direction:column;
-    align-items:flex-start;
-  }
-}
-`
