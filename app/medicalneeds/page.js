@@ -17,9 +17,9 @@ const publicSans = Public_Sans({
 
 const USD_RATE = 97;
 
-const WHATSAPP_NUMBER = "919000000000";
-const EMAIL = "care@medpact.in";
-const PHONE = "+91 90000 00000";
+const WHATSAPP_NUMBER = "919505417890";
+const EMAIL = "info@medpact.in";
+const PHONE = "+91 95054 17890";
 
 function formatUSD(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
