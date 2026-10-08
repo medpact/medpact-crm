@@ -168,12 +168,12 @@ export default function MedicalNeedsPage() {
     <main className={`${displayFont.variable} ${bodyFont.variable} site`}>
       <header className={`header ${scrolled ? "header-scrolled" : ""}`}>
         <div className="container header-inner">
-          <button className="brand" onClick={() => scrollToId("top")} aria-label="Medpact home">
-            <span className="brand-mark">M</span>
-            <span className="brand-copy">
-              <strong>medpact</strong>
-              <small>MEDICAL NEEDS</small>
-            </span>
+          <button className="brand" onClick={() => scrollToId("top")} aria-label="Medpact Medical Tourism home">
+            <img
+              src="/medicalneeds/medpact-medical-tourism-logo.png"
+              alt="Medpact Care — Your Health Journey to India"
+              className="tourism-logo"
+            />
           </button>
 
           <nav className={`desktop-nav ${mobileMenu ? "mobile-open" : ""}`}>
@@ -1223,6 +1223,15 @@ export default function MedicalNeedsPage() {
         .mobile-review-bar { display: none; }
 
 
+
+        .tourism-logo {
+          display: block;
+          width: 190px;
+          height: 66px;
+          object-fit: contain;
+          object-position: left center;
+        }
+
         /* POLISH — MICRO INTERACTIONS */
         .header {
           transition: min-height .25s ease, box-shadow .25s ease, background .25s ease;
@@ -1513,9 +1522,9 @@ export default function MedicalNeedsPage() {
             gap: 12px;
           }
 
-          .brand-mark, .footer-brand .brand-mark {
-            width: 36px;
-            height: 36px;
+          .tourism-logo {
+            width: 142px;
+            height: 52px;
           }
 
           .menu-toggle {
