@@ -105,7 +105,7 @@ export default async function TreatmentDetailPage({ params }) {
     <main
       className={`${newsreader.variable} ${publicSans.variable} treatmentDetail`}
     >
-      <style jsx global>{`
+      <style>{`
         :root {
           --t-ink: #17211f;
           --t-muted: #66726e;
