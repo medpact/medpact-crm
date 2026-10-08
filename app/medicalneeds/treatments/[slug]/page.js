@@ -1,980 +1,1023 @@
-import Link from "next/link"
-import { notFound } from "next/navigation"
-import { Newsreader, Public_Sans } from "next/font/google"
-import { createClient } from "@supabase/supabase-js"
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Newsreader, Public_Sans } from "next/font/google";
+import { createClient } from "@supabase/supabase-js";
 
-const displayFont = Newsreader({
+const newsreader = Newsreader({
   subsets: ["latin"],
-  variable: "--font-display",
-})
+  variable: "--font-newsreader",
+});
 
-const bodyFont = Public_Sans({
+const publicSans = Public_Sans({
   subsets: ["latin"],
-  variable: "--font-body",
-})
+  variable: "--font-public-sans",
+});
 
-function getClient() {
+const USD_RATE = 97;
+
+function formatUSD(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "—";
+  }
+
+  return `$${Math.round(Number(value) / USD_RATE).toLocaleString("en-US")}`;
+}
+
+function formatUSDRange(min, max) {
+  if (
+    min === null ||
+    min === undefined ||
+    max === null ||
+    max === undefined
+  ) {
+    return "Cost on request";
+  }
+
+  return `${formatUSD(min)} – ${formatUSD(max)}`;
+}
+
+function normalizeArray(value) {
+  if (Array.isArray(value)) return value;
+
+  if (!value) return [];
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getServerSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-}
-
-function money(value, currency = "INR") {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-    return "—"
-  }
-
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Number(value))
-}
-
-function formatList(items) {
-  if (!Array.isArray(items)) return []
-
-  return items.filter(
-    (item) =>
-      item !== null &&
-      item !== undefined &&
-      String(item).trim() !== ""
-  )
+  );
 }
 
 export async function generateMetadata({ params }) {
-  const { slug } = await params
-
-  const supabase = getClient()
+  const supabase = getServerSupabase();
 
   const { data } = await supabase
     .from("medical_treatments")
-    .select(
-      "name,specialty,description,india_cost_min,india_cost_max"
-    )
-    .eq("slug", slug)
+    .select("name, description, specialty")
+    .eq("slug", params.slug)
     .eq("is_published", true)
-    .maybeSingle()
+    .maybeSingle();
 
   if (!data) {
     return {
-      title: "Treatment | Medpact Care",
-    }
+      title: "Treatment | Medpact",
+      description:
+        "Explore medical treatments and procedures in India for international patients.",
+    };
   }
 
   return {
-    title: `${data.name} | Medpact Care`,
+    title: `${data.name} in India | Medpact`,
     description:
       data.description ||
-      `${data.name} treatment information, indicative India cost and care navigation from Medpact.`,
-  }
+      `Explore ${data.name}, indicative treatment costs, recovery and medical travel information in India.`,
+  };
 }
 
-export default async function TreatmentProfilePage({
-  params,
-}) {
-  const { slug } = await params
+export default async function TreatmentDetailPage({ params }) {
+  const supabase = getServerSupabase();
 
-  const supabase = getClient()
-
-  const {
-    data: treatment,
-    error,
-  } = await supabase
+  const { data: treatment, error } = await supabase
     .from("medical_treatments")
     .select("*")
-    .eq("slug", slug)
+    .eq("slug", params.slug)
     .eq("is_published", true)
-    .maybeSingle()
+    .maybeSingle();
 
   if (error || !treatment) {
-    notFound()
+    notFound();
   }
 
-  const includedItems = formatList(
-    treatment.generally_includes
-  )
-
-  const excludedItems = formatList(
-    treatment.commonly_excluded
-  )
-
-  const currency =
-    treatment.currency || "INR"
+  const includes = normalizeArray(treatment.generally_includes);
+  const excludes = normalizeArray(treatment.commonly_excluded);
 
   return (
     <main
-      className={`${displayFont.variable} ${bodyFont.variable} page`}
+      className={`${newsreader.variable} ${publicSans.variable} treatmentDetail`}
     >
-      <style
-        dangerouslySetInnerHTML={{
-          __html: styles,
-        }}
-      />
+      <style jsx global>{`
+        :root {
+          --t-ink: #17211f;
+          --t-muted: #66726e;
+          --t-green: #164d42;
+          --t-green-2: #236b5c;
+          --t-gold: #b28a43;
+          --t-bg: #f6f8f6;
+          --t-line: #dce4df;
+        }
 
-      {/* NAVIGATION */}
-      <header className="nav">
-        <Link
-          href="/medicalneeds"
-          className="brand"
-        >
-          <span className="brandMark">
-            M
-          </span>
+        * {
+          box-sizing: border-box;
+        }
 
-          <span>
-            Medpact <b>Care</b>
-          </span>
-        </Link>
+        body {
+          margin: 0;
+          background: var(--t-bg);
+          color: var(--t-ink);
+          font-family: var(--font-public-sans), sans-serif;
+        }
 
-        <nav>
-          <Link href="/medicalneeds">
-            Medical Needs
+        a {
+          color: inherit;
+          text-decoration: none;
+        }
+
+        .t-container {
+          width: min(1160px, calc(100% - 48px));
+          margin: 0 auto;
+        }
+
+        /* NAV */
+
+        .t-nav {
+          position: sticky;
+          top: 0;
+          z-index: 30;
+          border-bottom: 1px solid rgba(220, 228, 223, 0.9);
+          background: rgba(246, 248, 246, 0.94);
+          backdrop-filter: blur(18px);
+        }
+
+        .t-nav-inner {
+          min-height: 76px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+        }
+
+        .t-logo {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 21px;
+          font-weight: 800;
+        }
+
+        .t-logo-mark {
+          width: 37px;
+          height: 37px;
+          display: grid;
+          place-items: center;
+          border-radius: 11px;
+          background: var(--t-green);
+          color: white;
+          font-size: 19px;
+        }
+
+        .t-nav-links {
+          display: flex;
+          align-items: center;
+          gap: 25px;
+          color: #53605b;
+          font-size: 13px;
+        }
+
+        .t-nav-links a:hover {
+          color: var(--t-green);
+        }
+
+        .t-nav-cta {
+          border-radius: 999px;
+          padding: 11px 17px;
+          background: var(--t-green);
+          color: white;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        /* HERO */
+
+        .t-hero {
+          padding: 70px 0 65px;
+          background:
+            radial-gradient(
+              circle at 78% 0%,
+              rgba(218, 229, 222, 0.72),
+              transparent 30%
+            ),
+            var(--t-bg);
+        }
+
+        .t-breadcrumbs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 30px;
+          color: #84908b;
+          font-size: 11px;
+        }
+
+        .t-breadcrumbs a:hover {
+          color: var(--t-green);
+        }
+
+        .t-hero-grid {
+          display: grid;
+          grid-template-columns: 1fr 360px;
+          gap: 70px;
+          align-items: end;
+        }
+
+        .t-eyebrow {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          margin-bottom: 20px;
+          color: var(--t-gold);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 1.6px;
+          text-transform: uppercase;
+        }
+
+        .t-eyebrow::before {
+          content: "";
+          width: 27px;
+          height: 1px;
+          background: var(--t-gold);
+        }
+
+        .t-title {
+          max-width: 850px;
+          margin: 0;
+          font-family: var(--font-newsreader), serif;
+          font-size: clamp(50px, 6vw, 82px);
+          line-height: 0.94;
+          font-weight: 500;
+          letter-spacing: -3px;
+        }
+
+        .t-specialty {
+          margin-top: 18px;
+          color: var(--t-muted);
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .t-hero-description {
+          max-width: 760px;
+          margin: 24px 0 0;
+          color: #5d6965;
+          font-size: 16px;
+          line-height: 1.7;
+        }
+
+        .t-cost-card {
+          padding: 25px;
+          border-radius: 22px;
+          background: var(--t-green);
+          color: white;
+          box-shadow: 0 22px 55px rgba(22, 77, 66, 0.16);
+        }
+
+        .t-cost-label {
+          margin-bottom: 12px;
+          color: rgba(255, 255, 255, 0.62);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 1.4px;
+          text-transform: uppercase;
+        }
+
+        .t-cost-value {
+          font-family: var(--font-newsreader), serif;
+          font-size: 34px;
+          line-height: 1.05;
+          font-weight: 500;
+        }
+
+        .t-cost-sub {
+          margin-top: 12px;
+          color: rgba(255, 255, 255, 0.62);
+          font-size: 10px;
+          line-height: 1.55;
+        }
+
+        .t-usd {
+          display: inline-flex;
+          margin-top: 16px;
+          padding: 7px 9px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.78);
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        /* MAIN */
+
+        .t-main {
+          padding: 70px 0 100px;
+        }
+
+        .t-layout {
+          display: grid;
+          grid-template-columns: 1fr 320px;
+          gap: 70px;
+          align-items: start;
+        }
+
+        .t-section {
+          padding-bottom: 52px;
+          margin-bottom: 52px;
+          border-bottom: 1px solid var(--t-line);
+        }
+
+        .t-section:last-child {
+          margin-bottom: 0;
+        }
+
+        .t-kicker {
+          margin-bottom: 11px;
+          color: var(--t-gold);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 1.5px;
+          text-transform: uppercase;
+        }
+
+        .t-section h2 {
+          margin: 0 0 17px;
+          font-family: var(--font-newsreader), serif;
+          font-size: 39px;
+          line-height: 1;
+          font-weight: 500;
+          letter-spacing: -1px;
+        }
+
+        .t-section p {
+          margin: 0;
+          color: var(--t-muted);
+          font-size: 14px;
+          line-height: 1.8;
+        }
+
+        .t-list {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-top: 24px;
+        }
+
+        .t-list-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 14px;
+          border: 1px solid var(--t-line);
+          border-radius: 12px;
+          background: white;
+          color: #58645f;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .t-list-check {
+          width: 21px;
+          height: 21px;
+          flex: 0 0 21px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #eaf2ec;
+          color: var(--t-green);
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        .t-excluded .t-list-check {
+          background: #f2eeee;
+          color: #876c67;
+        }
+
+        .t-journey {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+          margin-top: 24px;
+        }
+
+        .t-journey-card {
+          padding: 18px;
+          border-radius: 14px;
+          background: white;
+          border: 1px solid var(--t-line);
+        }
+
+        .t-journey-number {
+          margin-bottom: 25px;
+          color: var(--t-gold);
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .t-journey-card strong {
+          display: block;
+          margin-bottom: 6px;
+          font-size: 13px;
+        }
+
+        .t-journey-card span {
+          color: var(--t-muted);
+          font-size: 11px;
+          line-height: 1.5;
+        }
+
+        /* SIDEBAR */
+
+        .t-sidebar {
+          position: sticky;
+          top: 100px;
+        }
+
+        .t-side-card {
+          margin-bottom: 15px;
+          padding: 23px;
+          border: 1px solid var(--t-line);
+          border-radius: 18px;
+          background: white;
+        }
+
+        .t-side-card h3 {
+          margin: 0 0 16px;
+          font-size: 13px;
+        }
+
+        .t-side-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 15px;
+          padding: 11px 0;
+          border-bottom: 1px solid #edf0ee;
+          font-size: 11px;
+        }
+
+        .t-side-row:last-child {
+          border-bottom: 0;
+        }
+
+        .t-side-row span:first-child {
+          color: #89938f;
+        }
+
+        .t-side-row span:last-child {
+          text-align: right;
+          font-weight: 700;
+        }
+
+        .t-side-important {
+          padding: 23px;
+          border-radius: 18px;
+          background: #edf3ee;
+        }
+
+        .t-side-important strong {
+          display: block;
+          margin-bottom: 8px;
+          font-size: 13px;
+        }
+
+        .t-side-important p {
+          margin: 0;
+          color: var(--t-muted);
+          font-size: 11px;
+          line-height: 1.65;
+        }
+
+        /* CTA */
+
+        .t-cta {
+          margin-top: 65px;
+          padding: 55px;
+          border-radius: 25px;
+          background: var(--t-green);
+          color: white;
+        }
+
+        .t-cta h2 {
+          max-width: 650px;
+          margin: 0;
+          font-family: var(--font-newsreader), serif;
+          font-size: 47px;
+          line-height: 1;
+          font-weight: 500;
+        }
+
+        .t-cta p {
+          max-width: 600px;
+          margin: 16px 0 25px;
+          color: rgba(255, 255, 255, 0.68);
+          font-size: 13px;
+          line-height: 1.65;
+        }
+
+        .t-cta-link {
+          display: inline-flex;
+          border-radius: 999px;
+          padding: 13px 18px;
+          background: white;
+          color: var(--t-green);
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .t-disclaimer {
+          margin-top: 30px;
+          color: #8b9691;
+          font-size: 10px;
+          line-height: 1.7;
+        }
+
+        @media (max-width: 950px) {
+          .t-hero-grid,
+          .t-layout {
+            grid-template-columns: 1fr;
+            gap: 40px;
+          }
+
+          .t-sidebar {
+            position: static;
+          }
+
+          .t-cost-card {
+            max-width: 500px;
+          }
+        }
+
+        @media (max-width: 700px) {
+          .t-nav-links {
+            display: none;
+          }
+
+          .t-title {
+            font-size: 50px;
+            letter-spacing: -2px;
+          }
+
+          .t-list,
+          .t-journey {
+            grid-template-columns: 1fr;
+          }
+
+          .t-section h2 {
+            font-size: 34px;
+          }
+
+          .t-cta {
+            padding: 32px 25px;
+          }
+
+          .t-cta h2 {
+            font-size: 39px;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .t-container {
+            width: min(100% - 30px, 1160px);
+          }
+
+          .t-nav-inner {
+            min-height: 66px;
+          }
+
+          .t-logo {
+            font-size: 19px;
+          }
+
+          .t-nav-cta {
+            padding: 10px 13px;
+            font-size: 11px;
+          }
+
+          .t-hero {
+            padding: 48px 0 45px;
+          }
+
+          .t-title {
+            font-size: 47px;
+          }
+
+          .t-cost-value {
+            font-size: 29px;
+          }
+
+          .t-main {
+            padding-top: 50px;
+          }
+        }
+      `}</style>
+
+      {/* NAV */}
+
+      <header className="t-nav">
+        <div className="t-container t-nav-inner">
+          <Link href="/medicalneeds" className="t-logo">
+            <span className="t-logo-mark">M</span>
+            <span>Medpact</span>
           </Link>
 
-          <Link href="/medicalneeds/doctors">
-            Doctors
-          </Link>
+          <nav className="t-nav-links">
+            <Link href="/medicalneeds">Home</Link>
+            <Link href="/medicalneeds/doctors">Doctors</Link>
+            <Link href="/medicalneeds/hospitals">Hospitals</Link>
+            <Link href="/medicalneeds/treatments">Treatments</Link>
+          </nav>
 
-          <Link href="/medicalneeds/hospitals">
-            Hospitals
+          <Link href="/medicalneeds/treatments" className="t-nav-cta">
+            All treatments
           </Link>
-
-          <Link href="/medicalneeds/treatments">
-            Treatments
-          </Link>
-        </nav>
-
-        <Link
-          href="/medicalneeds#review"
-          className="navCta"
-        >
-          Medical Review <span>↗</span>
-        </Link>
+        </div>
       </header>
 
-      {/* BREADCRUMB */}
-      <div className="crumb">
-        <Link href="/medicalneeds/treatments">
-          ← Treatment directory
-        </Link>
-      </div>
-
       {/* HERO */}
-      <section className="hero">
-        <div>
-          <div className="eyebrow">
-            {treatment.category ||
-              "TREATMENT"}
+
+      <section className="t-hero">
+        <div className="t-container">
+          <div className="t-breadcrumbs">
+            <Link href="/medicalneeds">Medpact</Link>
+            <span>›</span>
+            <Link href="/medicalneeds/treatments">Treatments</Link>
+            <span>›</span>
+            <span>{treatment.name}</span>
           </div>
 
-          <h1>{treatment.name}</h1>
+          <div className="t-hero-grid">
+            <div>
+              <div className="t-eyebrow">
+                {treatment.category || "Medical treatment"}
+              </div>
 
-          <p className="specialty">
-            {treatment.specialty ||
-              "Specialty information pending"}
-          </p>
+              <h1 className="t-title">{treatment.name}</h1>
 
-          {treatment.featured && (
-            <div className="badges">
-              <span>
-                ★ Featured treatment
-              </span>
+              {treatment.specialty && (
+                <div className="t-specialty">
+                  Specialty: {treatment.specialty}
+                </div>
+              )}
+
+              <p className="t-hero-description">
+                {treatment.description ||
+                  `Learn more about ${treatment.name}, including typical stay, recovery and indicative treatment costs in India.`}
+              </p>
             </div>
-          )}
 
-          <p className="description">
-            {treatment.description ||
-              "Treatment information is being curated by the Medpact team."}
-          </p>
+            <div className="t-cost-card">
+              <div className="t-cost-label">
+                Estimated treatment cost in India
+              </div>
 
-          <Link
-            href="/medicalneeds#review"
-            className="primary"
-          >
-            Discuss this treatment{" "}
-            <span>↗</span>
-          </Link>
-        </div>
-
-        {/* COST CARD */}
-        <div className="costCard">
-          <div className="eyebrow">
-            INDICATIVE INDIA COST
-          </div>
-
-          <strong>
-            {treatment.india_cost_min !=
-              null &&
-            treatment.india_cost_max !=
-              null
-              ? `${money(
+              <div className="t-cost-value">
+                {formatUSDRange(
                   treatment.india_cost_min,
-                  currency
-                )} – ${money(
-                  treatment.india_cost_max,
-                  currency
-                )}`
-              : "Cost on request"}
-          </strong>
+                  treatment.india_cost_max
+                )}
+              </div>
 
-          <span className="costNote">
-            Indicative treatment benchmark in
-            India. This is not a hospital
-            quotation.
-          </span>
+              <div className="t-usd">USD · INTERNATIONAL PATIENT VIEW</div>
 
-          <div className="mini">
-            <div>
-              <small>
-                Typical hospital stay
-              </small>
-
-              <b>
-                {treatment.typical_stay ||
-                  "Varies"}
-              </b>
-            </div>
-
-            <div>
-              <small>
-                Typical recovery
-              </small>
-
-              <b>
-                {treatment.recovery_time ||
-                  "Varies"}
-              </b>
+              <div className="t-cost-sub">
+                Indicative range only. Actual costs depend on diagnosis,
+                treatment complexity and individual clinical requirements.
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CONTENT */}
-      <section className="content">
-        <div className="main">
-          {/* DESCRIPTION */}
-          <Block title="About this treatment">
-            <p>
-              {treatment.description ||
-                "Detailed treatment information will be added by the Medpact team after verification."}
-            </p>
-          </Block>
+      {/* MAIN */}
 
-          {/* WHAT IS GENERALLY INCLUDED */}
-          <Block title="What may generally be included">
-            {includedItems.length > 0 ? (
-              <ul>
-                {includedItems.map(
-                  (item, index) => (
-                    <li key={`${item}-${index}`}>
-                      {item}
-                    </li>
-                  )
-                )}
-              </ul>
-            ) : (
+      <section className="t-main">
+        <div className="t-container t-layout">
+          <div>
+            {/* ABOUT */}
+
+            <section className="t-section">
+              <div className="t-kicker">01 · Overview</div>
+
+              <h2>About this treatment</h2>
+
               <p>
-                Inclusion details vary by
-                treatment and care plan and
-                should be confirmed before
-                treatment.
+                {treatment.description ||
+                  `This page provides general information about ${treatment.name}. The appropriate treatment approach depends on the patient's diagnosis, medical history and clinical assessment.`}
               </p>
-            )}
-          </Block>
+            </section>
 
-          {/* WHAT MAY BE EXCLUDED */}
-          <Block title="What may commonly be excluded">
-            {excludedItems.length > 0 ? (
-              <ul>
-                {excludedItems.map(
-                  (item, index) => (
-                    <li key={`${item}-${index}`}>
-                      {item}
-                    </li>
-                  )
-                )}
-              </ul>
-            ) : (
-              <p>
-                Additional procedures,
-                complications, medicines,
-                travel and other services may
-                be charged separately depending
-                on the treatment plan.
-              </p>
-            )}
-          </Block>
+            {/* INCLUDED */}
 
-          {/* STAY + RECOVERY */}
-          <Block title="Treatment journey">
-            <div className="journeyGrid">
-              <div className="journeyCard">
-                <div className="journeyIcon">
-                  ⌂
+            {includes.length > 0 && (
+              <section className="t-section">
+                <div className="t-kicker">02 · Planning</div>
+
+                <h2>What may generally be included</h2>
+
+                <p>
+                  The following items may commonly form part of a treatment
+                  journey. The exact package or clinical plan varies by patient
+                  and provider.
+                </p>
+
+                <div className="t-list">
+                  {includes.map((item, index) => (
+                    <div className="t-list-item" key={`${item}-${index}`}>
+                      <span className="t-list-check">✓</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* EXCLUDED */}
+
+            {excludes.length > 0 && (
+              <section className="t-section">
+                <div className="t-kicker">03 · Cost clarity</div>
+
+                <h2>What may commonly be excluded</h2>
+
+                <p>
+                  These items may be outside an indicative treatment estimate
+                  and can vary depending on the patient's circumstances.
+                </p>
+
+                <div className="t-list t-excluded">
+                  {excludes.map((item, index) => (
+                    <div className="t-list-item" key={`${item}-${index}`}>
+                      <span className="t-list-check">!</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* JOURNEY */}
+
+            <section className="t-section">
+              <div className="t-kicker">04 · Journey</div>
+
+              <h2>What the treatment journey may look like</h2>
+
+              <div className="t-journey">
+                <div className="t-journey-card">
+                  <div className="t-journey-number">01</div>
+
+                  <strong>Clinical assessment</strong>
+
+                  <span>
+                    Diagnosis, medical history and reports are reviewed to
+                    determine the appropriate treatment pathway.
+                  </span>
                 </div>
 
-                <div>
-                  <small>
-                    TYPICAL HOSPITAL STAY
-                  </small>
+                <div className="t-journey-card">
+                  <div className="t-journey-number">02</div>
 
-                  <strong>
-                    {treatment.typical_stay ||
-                      "Varies by case"}
-                  </strong>
+                  <strong>Treatment planning</strong>
+
+                  <span>
+                    The medical team determines the procedure, investigations
+                    and preparation required for the individual case.
+                  </span>
+                </div>
+
+                <div className="t-journey-card">
+                  <div className="t-journey-number">03</div>
+
+                  <strong>Procedure & recovery</strong>
+
+                  <span>
+                    Treatment is followed by monitoring, recovery and
+                    appropriate follow-up.
+                  </span>
                 </div>
               </div>
+            </section>
 
-              <div className="journeyCard">
-                <div className="journeyIcon">
-                  ↗
+            {/* INTERNATIONAL */}
+
+            <section className="t-section">
+              <div className="t-kicker">05 · Medical travel</div>
+
+              <h2>For international patients</h2>
+
+              <p>
+                {treatment.international_note ||
+                  "International patients should plan for clinical consultation, treatment, recovery and follow-up according to the treating doctor's advice. Travel duration and accommodation requirements can vary significantly by case."}
+              </p>
+            </section>
+
+            {/* COST */}
+
+            <section className="t-section">
+              <div className="t-kicker">06 · Cost guide</div>
+
+              <h2>Understanding the cost</h2>
+
+              <p>
+                The indicative treatment range for this procedure in India is:
+              </p>
+
+              <div
+                style={{
+                  marginTop: 22,
+                  padding: "25px",
+                  borderRadius: 17,
+                  background: "#edf3ee",
+                  color: "#164d42",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: 1.2,
+                    textTransform: "uppercase",
+                    marginBottom: 8,
+                  }}
+                >
+                  Estimated cost in India
                 </div>
 
-                <div>
-                  <small>
-                    TYPICAL RECOVERY
-                  </small>
+                <div
+                  style={{
+                    fontFamily: "var(--font-newsreader), serif",
+                    fontSize: 38,
+                    lineHeight: 1,
+                    fontWeight: 500,
+                  }}
+                >
+                  {formatUSDRange(
+                    treatment.india_cost_min,
+                    treatment.india_cost_max
+                  )}
+                </div>
 
-                  <strong>
-                    {treatment.recovery_time ||
-                      "Varies by case"}
-                  </strong>
+                <div
+                  style={{
+                    marginTop: 10,
+                    color: "#66726e",
+                    fontSize: 11,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Displayed in USD for international patients. This is an
+                  indicative range, not a quotation.
                 </div>
               </div>
-            </div>
-          </Block>
+            </section>
 
-          {/* INTERNATIONAL NOTE */}
-          <Block title="For international patients">
-            <p>
-              {treatment.international_note ||
-                "International patients should confirm the treatment plan, expected hospital stay, documentation requirements and final estimate with the treating hospital before travelling."}
-            </p>
-          </Block>
+            {/* CTA */}
 
-          {/* COST EXPLANATION */}
-          <Block title="Understanding the cost">
-            <p>
-              The amount shown above is an
-              indicative treatment-level
-              benchmark for India. Actual cost
-              can vary depending on diagnosis,
-              clinical complexity, implant or
-              device selection, surgeon
-              requirements, length of stay,
-              medicines, investigations and
-              complications.
-            </p>
+            <div className="t-cta">
+              <h2>Need help understanding your treatment options?</h2>
 
-            <p>
-              Medpact can help you understand
-              the treatment pathway and request
-              a more specific estimate for your
-              case.
-            </p>
-          </Block>
-        </div>
+              <p>
+                If you are considering treatment in India, you can start a
+                conversation with Medpact about your requirement and next
+                steps.
+              </p>
 
-        {/* SIDEBAR */}
-        <aside>
-          <div className="sideCard primarySide">
-            <div className="eyebrow">
-              CARE NAVIGATION
+              <a
+                href={`https://wa.me/919000000000?text=${encodeURIComponent(
+                  `Hello Medpact, I am interested in ${treatment.name} and would like to understand treatment options in India.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="t-cta-link"
+              >
+                Talk to Medpact →
+              </a>
             </div>
 
-            <h3>
-              Need help deciding where to
-              start?
-            </h3>
+            <div className="t-disclaimer">
+              <strong>Medical information:</strong> This page is intended for
+              general informational purposes and medical-travel planning. It
+              does not replace consultation with a qualified medical
+              professional. Treatment suitability, procedure choice, recovery
+              and final cost must be determined by the treating medical team.
+            </div>
+          </div>
 
-            <p>
-              Share your medical reports and
-              requirements with Medpact. Our
-              team can help you understand the
-              next steps.
-            </p>
+          {/* SIDEBAR */}
 
-            <Link
-              href="/medicalneeds#review"
-              className="sideLink"
+          <aside className="t-sidebar">
+            <div className="t-side-card">
+              <h3>Treatment snapshot</h3>
+
+              <div className="t-side-row">
+                <span>Specialty</span>
+                <span>
+                  {treatment.specialty || "Not specified"}
+                </span>
+              </div>
+
+              <div className="t-side-row">
+                <span>Category</span>
+                <span>
+                  {treatment.category || "Not specified"}
+                </span>
+              </div>
+
+              <div className="t-side-row">
+                <span>Typical stay</span>
+                <span>
+                  {treatment.typical_stay || "Varies"}
+                </span>
+              </div>
+
+              <div className="t-side-row">
+                <span>Recovery</span>
+                <span>
+                  {treatment.recovery_time || "Varies"}
+                </span>
+              </div>
+
+              <div className="t-side-row">
+                <span>Cost currency</span>
+                <span>USD</span>
+              </div>
+            </div>
+
+            <div className="t-side-important">
+              <strong>Planning treatment in India?</strong>
+
+              <p>
+                Use the information on this page as a starting point. A
+                patient's diagnosis and clinical requirements can significantly
+                affect treatment planning and cost.
+              </p>
+            </div>
+
+            <div
+              className="t-side-card"
+              style={{
+                marginTop: 15,
+                background: "#164d42",
+                color: "white",
+                borderColor: "#164d42",
+              }}
             >
-              Request a medical review →
-            </Link>
-          </div>
+              <h3
+                style={{
+                  color: "white",
+                  marginBottom: 10,
+                }}
+              >
+                Explore more
+              </h3>
 
-          <div className="sideCard">
-            <div className="eyebrow">
-              IMPORTANT
+              <Link
+                href="/medicalneeds/treatments"
+                style={{
+                  display: "block",
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: 12,
+                  padding: "8px 0",
+                }}
+              >
+                All treatments →
+              </Link>
+
+              <Link
+                href="/medicalneeds/doctors"
+                style={{
+                  display: "block",
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: 12,
+                  padding: "8px 0",
+                }}
+              >
+                Find doctors →
+              </Link>
+
+              <Link
+                href="/medicalneeds/hospitals"
+                style={{
+                  display: "block",
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: 12,
+                  padding: "8px 0",
+                }}
+              >
+                Explore hospitals →
+              </Link>
             </div>
-
-            <p>
-              Costs displayed on this page are
-              indicative and should not be
-              considered a final treatment
-              quotation.
-            </p>
-
-            <p>
-              Treatment decisions should always
-              be made in consultation with a
-              qualified medical professional.
-            </p>
-          </div>
-
-          {treatment.last_verified_at && (
-            <div className="verifiedCard">
-              <span>LAST VERIFIED</span>
-
-              <strong>
-                {new Date(
-                  treatment.last_verified_at
-                ).toLocaleDateString(
-                  "en-IN",
-                  {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  }
-                )}
-              </strong>
-            </div>
-          )}
-        </aside>
-      </section>
-
-      {/* BOTTOM CTA */}
-      <section className="bottomCta">
-        <div>
-          <span className="eyebrow">
-            READY TO EXPLORE YOUR OPTIONS?
-          </span>
-
-          <h2>
-            Let Medpact help you navigate
-            treatment in India.
-          </h2>
+          </aside>
         </div>
-
-        <Link
-          href="/medicalneeds#review"
-          className="primary"
-        >
-          Start a medical review{" "}
-          <span>↗</span>
-        </Link>
       </section>
-
-      {/* FOOTER */}
-      <footer>
-        <Link
-          href="/medicalneeds"
-          className="brand"
-        >
-          <span className="brandMark">
-            M
-          </span>
-
-          <span>
-            Medpact <b>Care</b>
-          </span>
-        </Link>
-
-        <span>
-          Medical information for care
-          navigation. Costs are indicative and
-          not hospital quotations.
-        </span>
-      </footer>
     </main>
-  )
+  );
 }
-
-function Block({ title, children }) {
-  return (
-    <section className="block">
-      <h2>{title}</h2>
-      {children}
-    </section>
-  )
-}
-
-const styles = `
-:root{
-  --ink:#12201d;
-  --muted:#687571;
-  --line:#dfe7e3;
-  --paper:#f6f8f5;
-  --accent:#0e7569;
-  --soft:#e8f2ee;
-}
-
-*{
-  box-sizing:border-box;
-}
-
-body{
-  margin:0;
-  background:var(--paper);
-  color:var(--ink);
-  font-family:var(--font-body),Arial,sans-serif;
-}
-
-.nav{
-  height:78px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 clamp(20px,5vw,72px);
-  border-bottom:1px solid var(--line);
-  background:rgba(246,248,245,.94);
-  position:sticky;
-  top:0;
-  z-index:20;
-  backdrop-filter:blur(16px);
-}
-
-.brand{
-  display:flex;
-  gap:10px;
-  align-items:center;
-  color:var(--ink);
-  font-weight:700;
-  text-decoration:none;
-  letter-spacing:-.03em;
-}
-
-.brand b{
-  font-weight:400;
-  color:var(--accent);
-}
-
-.brandMark{
-  width:34px;
-  height:34px;
-  border-radius:11px;
-  background:var(--ink);
-  color:#fff;
-  display:grid;
-  place-items:center;
-  font-family:var(--font-display);
-  font-size:21px;
-}
-
-.nav nav{
-  display:flex;
-  gap:24px;
-}
-
-.nav nav a{
-  font-size:13px;
-  color:#586560;
-  text-decoration:none;
-}
-
-.nav nav a:hover{
-  color:var(--accent);
-}
-
-.navCta,
-.primary{
-  background:var(--ink);
-  color:#fff;
-  text-decoration:none;
-  padding:13px 17px;
-  border-radius:12px;
-  font-size:13px;
-  font-weight:700;
-}
-
-.crumb{
-  max-width:1200px;
-  margin:auto;
-  padding:30px 25px 10px;
-}
-
-.crumb a{
-  color:#64716d;
-  text-decoration:none;
-  font-size:13px;
-}
-
-.crumb a:hover{
-  color:var(--accent);
-}
-
-.hero{
-  max-width:1200px;
-  margin:auto;
-  padding:35px 25px 65px;
-  display:grid;
-  grid-template-columns:1.15fr .85fr;
-  gap:55px;
-  align-items:center;
-}
-
-.eyebrow{
-  font-size:10px;
-  letter-spacing:.16em;
-  color:var(--accent);
-  font-weight:800;
-}
-
-.hero h1{
-  font-family:var(--font-display);
-  font-weight:400;
-  font-size:clamp(55px,7vw,88px);
-  line-height:.9;
-  letter-spacing:-.05em;
-  margin:14px 0;
-}
-
-.specialty{
-  color:var(--accent);
-  font-size:13px;
-  font-weight:700;
-}
-
-.badges{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin:18px 0;
-}
-
-.badges span{
-  background:var(--soft);
-  color:var(--accent);
-  border-radius:999px;
-  padding:8px 11px;
-  font-size:10px;
-  font-weight:800;
-}
-
-.description{
-  font-size:16px;
-  color:#5f6d68;
-  line-height:1.7;
-  max-width:700px;
-  margin:24px 0;
-}
-
-.costCard{
-  background:var(--ink);
-  color:#fff;
-  border-radius:28px;
-  padding:30px;
-  box-shadow:0 20px 60px rgba(18,32,29,.12);
-}
-
-.costCard strong{
-  display:block;
-  font-family:var(--font-display);
-  font-size:39px;
-  font-weight:400;
-  margin:14px 0 7px;
-  line-height:1.05;
-}
-
-.costNote{
-  color:#b9c9c3;
-  font-size:11px;
-  line-height:1.5;
-  display:block;
-}
-
-.mini{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:25px;
-}
-
-.mini div{
-  background:#20332f;
-  border-radius:13px;
-  padding:14px;
-}
-
-.mini small,
-.mini b{
-  display:block;
-}
-
-.mini small{
-  color:#91aaa2;
-  font-size:9px;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-}
-
-.mini b{
-  font-size:12px;
-  margin-top:6px;
-  line-height:1.4;
-}
-
-.content{
-  max-width:1200px;
-  margin:auto;
-  padding:0 25px 90px;
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 310px;
-  gap:45px;
-}
-
-.block{
-  padding:32px 0;
-  border-top:1px solid var(--line);
-}
-
-.block:first-child{
-  padding-top:0;
-  border-top:0;
-}
-
-.block h2{
-  font-family:var(--font-display);
-  font-size:34px;
-  font-weight:400;
-  margin:0 0 17px;
-}
-
-.block p,
-.block li{
-  color:#5f6d68;
-  line-height:1.75;
-  font-size:14px;
-}
-
-.block p+p{
-  margin-top:18px;
-}
-
-.block ul{
-  padding-left:20px;
-}
-
-.block li{
-  margin-bottom:8px;
-}
-
-.journeyGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px;
-}
-
-.journeyCard{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:17px;
-  padding:18px;
-  display:flex;
-  align-items:center;
-  gap:13px;
-}
-
-.journeyIcon{
-  width:42px;
-  height:42px;
-  border-radius:13px;
-  background:var(--soft);
-  color:var(--accent);
-  display:grid;
-  place-items:center;
-  font-weight:700;
-}
-
-.journeyCard small,
-.journeyCard strong{
-  display:block;
-}
-
-.journeyCard small{
-  color:#77837f;
-  font-size:9px;
-  letter-spacing:.08em;
-  font-weight:800;
-}
-
-.journeyCard strong{
-  margin-top:6px;
-  font-size:12px;
-  line-height:1.4;
-}
-
-.sideCard{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:20px;
-  padding:23px;
-  margin-bottom:15px;
-}
-
-.sideCard h3{
-  font-family:var(--font-display);
-  font-weight:400;
-  font-size:28px;
-  line-height:1.1;
-  margin:13px 0;
-}
-
-.sideCard p{
-  font-size:12px;
-  line-height:1.7;
-  color:#60706a;
-}
-
-.sideLink{
-  display:block;
-  background:var(--ink);
-  color:#fff;
-  text-decoration:none;
-  text-align:center;
-  border-radius:11px;
-  padding:12px 14px;
-  font-size:12px;
-  font-weight:700;
-  margin-top:17px;
-}
-
-.primarySide{
-  background:#e3eee9;
-  border-color:#d3e3dd;
-}
-
-.verifiedCard{
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:17px;
-  background:#fff;
-}
-
-.verifiedCard span,
-.verifiedCard strong{
-  display:block;
-}
-
-.verifiedCard span{
-  color:#7a8581;
-  font-size:9px;
-  letter-spacing:.1em;
-  font-weight:800;
-}
-
-.verifiedCard strong{
-  margin-top:6px;
-  font-size:13px;
-  color:var(--accent);
-}
-
-.bottomCta{
-  max-width:1200px;
-  margin:0 auto 80px;
-  padding:45px clamp(20px,5vw,60px);
-  border-radius:28px;
-  background:#e3eee9;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:30px;
-}
-
-.bottomCta h2{
-  font-family:var(--font-display);
-  font-weight:400;
-  font-size:38px;
-  line-height:1.05;
-  margin:0;
-  max-width:650px;
-}
-
-footer{
-  border-top:1px solid var(--line);
-  padding:25px clamp(20px,5vw,72px);
-  display:flex;
-  justify-content:space-between;
-  gap:20px;
-  align-items:center;
-  color:#7b8581;
-  font-size:10px;
-}
-
-footer .brand{
-  color:var(--ink);
-  font-size:14px;
-}
-
-@media(max-width:900px){
-
-  .nav nav{
-    display:none;
-  }
-
-  .hero{
-    grid-template-columns:1fr;
-  }
-
-  .content{
-    grid-template-columns:1fr;
-  }
-}
-
-@media(max-width:620px){
-
-  .nav{
-    height:68px;
-  }
-
-  .navCta{
-    font-size:11px;
-    padding:10px 12px;
-  }
-
-  .crumb{
-    padding:20px;
-  }
-
-  .hero{
-    padding:20px 20px 50px;
-  }
-
-  .hero h1{
-    font-size:55px;
-  }
-
-  .content{
-    padding:0 20px 60px;
-  }
-
-  .mini{
-    grid-template-columns:1fr;
-  }
-
-  .journeyGrid{
-    grid-template-columns:1fr;
-  }
-
-  .bottomCta{
-    margin-left:20px;
-    margin-right:20px;
-    flex-direction:column;
-    align-items:flex-start;
-  }
-
-  .bottomCta h2{
-    font-size:32px;
-  }
-
-  footer{
-    flex-direction:column;
-    align-items:flex-start;
-  }
-}
-`
