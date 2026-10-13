@@ -13,18 +13,18 @@ export function middleware(request) {
     const path = pathname === "/" ? "" : pathname
 
     return NextResponse.rewrite(
-      new URL(`/medicaltourism${path}`, request.url)
+      new URL(`/medicalneeds${path}`, request.url)
     )
   }
 
-  // Public doctors recruitment website
+  // Public doctor recruitment website
   if (host === "www.medpact.in" || host === "medpact.in") {
     return NextResponse.rewrite(
       new URL(`/recruitment${pathname}`, request.url)
     )
   }
 
-  // Internal dashboard: route its homepage to the dedicated dashboard page.
+  // Internal dashboard
   if (host === "dashboard.medpact.in") {
     if (pathname === "/") {
       return NextResponse.rewrite(
