@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -5,43 +6,69 @@ import { useRouter, usePathname } from "next/navigation"
 import Sidebar from "./sidebar"
 
 export default function ClientLayout({ children }) {
-
   const router = useRouter()
   const pathname = usePathname()
-
   const [checked, setChecked] = useState(false)
 
   useEffect(() => {
+    const host = window.location.hostname.toLowerCase()
 
-    const user = localStorage.getItem("medpact_user")
+    const isMedicalSite = host === "care.medpact.in"
 
-    const host = window.location.hostname
+    const isRecruitmentSite =
+      host === "www.medpact.in" ||
+      host === "medpact.in" ||
+      pathname === "/recruitment" ||
+      pathname.startsWith("/recruitment/")
 
-    const isMedicalSite = host.includes("care.medpact.in")
+    if (isMedicalSite || isRecruitmentSite || pathname === "/login") {
+      setChecked(true)
+      return
+    }
 
-    // 🔒 Only protect dashboard domain
-    if (!user && !isMedicalSite && pathname !== "/login") {
-      router.push("/login")
+    const userStr = localStorage.getItem("medpact_user")
+    let loggedIn = false
+
+    if (userStr) {
+      try {
+        const userObj = JSON.parse(userStr)
+        loggedIn = Boolean(userObj.username)
+      } catch {
+        loggedIn = false
+      }
+    }
+
+    if (!loggedIn) {
+      router.replace("/login")
+      return
     }
 
     setChecked(true)
+  }, [pathname, router])
 
-  }, [pathname])
-
-  // ⏳ Wait until auth check completes
   if (!checked) return null
 
   const host =
-    typeof window !== "undefined" ? window.location.hostname : ""
+    typeof window !== "undefined"
+      ? window.location.hostname.toLowerCase()
+      : ""
 
-  const isMedicalSite = host.includes("care.medpact.in")
+  const isMedicalSite = host === "care.medpact.in"
 
-  // 🌍 Public pages (no sidebar)
-  if (pathname === "/login" || isMedicalSite) {
+  const isRecruitmentSite =
+    host === "www.medpact.in" ||
+    host === "medpact.in" ||
+    pathname === "/recruitment" ||
+    pathname.startsWith("/recruitment/")
+
+  if (
+    pathname === "/login" ||
+    isMedicalSite ||
+    isRecruitmentSite
+  ) {
     return children
   }
 
-  // 🔒 Protected dashboard layout
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
