@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server"
 
 export function middleware(request) {
@@ -7,27 +8,30 @@ export function middleware(request) {
 
   const pathname = request.nextUrl.pathname
 
-  // Medical Tourism
+  // Medical tourism website
   if (host === "care.medpact.in") {
     const path = pathname === "/" ? "" : pathname
 
     return NextResponse.rewrite(
-      new URL(/medicaltourism${path}, request.url)
+      new URL(`/medicalneeds${path}`, request.url)
     )
   }
 
-  // Doctors Recruitment Website
-  if (
-    host === "www.medpact.in" ||
-    host === "medpact.in"
-  ) {
+  // Public doctors recruitment website
+  if (host === "www.medpact.in" || host === "medpact.in") {
     return NextResponse.rewrite(
-      new URL(/recruitment${pathname}, request.url)
+      new URL(`/recruitment${pathname}`, request.url)
     )
   }
 
-  // Existing Dashboard
+  // Internal dashboard: route its homepage to the dedicated dashboard page.
   if (host === "dashboard.medpact.in") {
+    if (pathname === "/") {
+      return NextResponse.rewrite(
+        new URL("/dashboard", request.url)
+      )
+    }
+
     return NextResponse.next()
   }
 
