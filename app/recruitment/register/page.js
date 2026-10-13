@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { getSupabaseBrowserClient } from "../../../lib/supabase"
+import { supabase } from "../../../lib/supabase"
 
 const C = {
   navy: "#102b46",
@@ -93,7 +93,7 @@ export default function DoctorRegistrationPage() {
 
     async function loadSpecialties() {
       try {
-        const supabase = getSupabaseBrowserClient()
+        
 
         const { data, error } = await supabase
           .from("specialties")
