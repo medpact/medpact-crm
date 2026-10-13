@@ -1,7 +1,7 @@
 
 import { NextResponse } from "next/server"
 
-export function middleware(request) {
+export function proxy(request) {
   const host = (request.headers.get("host") || "")
     .split(":")[0]
     .toLowerCase()
@@ -10,21 +10,19 @@ export function middleware(request) {
 
   // Medical tourism website
   if (host === "care.medpact.in") {
-    const path = pathname === "/" ? "" : pathname
-
     return NextResponse.rewrite(
-      new URL(`/medicalneeds${path}`, request.url)
+      new URL(`/medicalneeds${pathname === "/" ? "" : pathname}`, request.url)
     )
   }
 
-  // Public doctor recruitment website
+  // Public recruitment website
   if (host === "www.medpact.in" || host === "medpact.in") {
     return NextResponse.rewrite(
       new URL(`/recruitment${pathname}`, request.url)
     )
   }
 
-  // Internal dashboard
+  // Internal CRM dashboard
   if (host === "dashboard.medpact.in") {
     if (pathname === "/") {
       return NextResponse.rewrite(
