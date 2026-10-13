@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server"
 
 export function middleware(request) {
@@ -13,7 +12,7 @@ export function middleware(request) {
     const path = pathname === "/" ? "" : pathname
 
     return NextResponse.rewrite(
-      new URL(`/medicalneeds${path}`, request.url)
+      new URL(/medicaltourism${path}, request.url)
     )
   }
 
@@ -23,7 +22,7 @@ export function middleware(request) {
     host === "medpact.in"
   ) {
     return NextResponse.rewrite(
-      new URL(`/recruitment${pathname}`, request.url)
+      new URL(/recruitment${pathname}, request.url)
     )
   }
 
