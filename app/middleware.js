@@ -1,14 +1,15 @@
-import { NextResponse } from 'next/server'
+
+import { NextResponse } from "next/server"
 
 export function middleware(request) {
-  const host = request.headers.get('host') || ''
+  const host = (request.headers.get("host") || "")
+    .split(":")[0]
+    .toLowerCase()
+
   const pathname = request.nextUrl.pathname
 
-  // Normalize host (remove port if exists)
-  const cleanHost = host.split(':')[0]
-
-  // 🌍 Medical Tourism Domain
-  if (cleanHost === 'care.medpact.in') {
+  // Medical Tourism
+  if (host === "care.medpact.in") {
     const path = pathname === "/" ? "" : pathname
 
     return NextResponse.rewrite(
@@ -16,8 +17,18 @@ export function middleware(request) {
     )
   }
 
-  // 📊 Dashboard Domain
-  if (cleanHost === 'dashboard.medpact.in') {
+  // Doctors Recruitment Website
+  if (
+    host === "www.medpact.in" ||
+    host === "medpact.in"
+  ) {
+    return NextResponse.rewrite(
+      new URL(`/recruitment${pathname}`, request.url)
+    )
+  }
+
+  // Existing Dashboard
+  if (host === "dashboard.medpact.in") {
     return NextResponse.next()
   }
 
@@ -25,5 +36,5 @@ export function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/', '/((?!api|_next|favicon.ico).*)'],
+  matcher: ["/", "/((?!api|_next|favicon.ico).*)"],
 }
