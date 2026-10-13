@@ -8,25 +8,22 @@ export function proxy(request) {
 
   const pathname = request.nextUrl.pathname
 
- // Medical tourism website
-if (host === "care.medpact.in") {
-  // Let Next.js serve public assets directly.
-  if (
-    pathname.startsWith("/medicalneeds/") &&
-    pathname.includes(".")
-  ) {
+  // Serve static files directly from the public folder.
+  if (pathname.includes(".")) {
     return NextResponse.next()
   }
 
-  return NextResponse.rewrite(
-    new URL(
-      `/medicalneeds${pathname === "/" ? "" : pathname}`,
-      request.url
+  // Medical tourism website
+  if (host === "care.medpact.in") {
+    return NextResponse.rewrite(
+      new URL(
+        `/medicalneeds${pathname === "/" ? "" : pathname}`,
+        request.url
+      )
     )
-  )
-}
+  }
 
-  // Public recruitment website
+  // Public doctors recruitment website
   if (host === "www.medpact.in" || host === "medpact.in") {
     return NextResponse.rewrite(
       new URL(`/recruitment${pathname}`, request.url)
