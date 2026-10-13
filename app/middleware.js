@@ -13,7 +13,7 @@ export function middleware(request) {
     const path = pathname === "/" ? "" : pathname
 
     return NextResponse.rewrite(
-      new URL(`/medicalneeds${path}`, request.url)
+      new URL(`/medicaltourism${path}`, request.url)
     )
   }
 
