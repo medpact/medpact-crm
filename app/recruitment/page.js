@@ -95,7 +95,17 @@ export default function RecruitmentHomePage() {
             color: "#10233f",
             textDecoration: "none",
           }}>
-            medpact<span style={{ color: "#087e8b" }}>.</span>
+            <img
+  src="/medpact-recruitment-logo.png"
+  alt="Medpact Healthcare Private Limited"
+  style={{
+    display: "block",
+    width: "230px",
+    maxWidth: "100%",
+    height: "auto",
+    objectFit: "contain",
+  }}
+/>
             <div style={{
               fontSize: 10,
               letterSpacing: 2,
