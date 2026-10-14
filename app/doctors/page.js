@@ -29,16 +29,15 @@ export default function DoctorsPage() {
   }, [search, specialty, city, availability, source, page])
 
   function formatDate(date) {
-    if (!date) return ""
+  if (!date) return ""
 
-    const d = new Date(date)
-    const day = String(d.getDate()).padStart(2, "0")
-    const month = String(d.getMonth() + 1).padStart(2, "0")
-    const year = d.getFullYear()
+  const d = new Date(date)
+  const day = String(d.getDate()).padStart(2, "0")
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const year = d.getFullYear()
 
-    return `${day}/${month}/${year}`
-  }
-
+  return day + "/" + month + "/" + year
+}
   function getSourceLabel(value) {
     if (value === "Online Registration") return "Online Registration"
     if (value === "Google Form") return "Google Form"
