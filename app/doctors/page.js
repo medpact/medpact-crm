@@ -71,6 +71,7 @@ availability_status,
 specialty_id,
 preferred_location,
 created_at,
+source,
 specialties(name)
 `,{count:"exact"})
 .order("created_at",{ascending:false})
@@ -218,30 +219,45 @@ style={{padding:"8px",border:"1px solid #ddd",borderRadius:"6px"}}
 
 
 <td>
-  <div style={{ fontWeight: "600" }}>
-    {d.name}
-  </div>
+  <div>{d.name}</div>
 
-  {d.source && (
-    <div style={{ marginTop: "5px" }}>
-      <span
-        style={{
-          display: "inline-block",
-          padding: "2px 7px",
-          borderRadius: "10px",
-          fontSize: "10px",
-          fontWeight: "600",
-          background:
-            d.source === "Google Form" ? "#dcfce7" : "#dbeafe",
-          color:
-            d.source === "Google Form" ? "#166534" : "#1d4ed8",
-        }}
-      >
-        {d.source === "Google Form" ? "Google Form" : "Website"}
-      </span>
-    </div>
+  {d.source === "Medpact Website" && (
+    <span
+      style={{
+        display: "inline-block",
+        marginTop: "4px",
+        padding: "2px 6px",
+        borderRadius: "4px",
+        fontSize: "10px",
+        fontWeight: "700",
+        color: "#1d4ed8",
+        background: "#dbeafe",
+        verticalAlign: "super",
+      }}
+    >
+      WEBSITE
+    </span>
+  )}
+
+  {d.source === "google_form" && (
+    <span
+      style={{
+        display: "inline-block",
+        marginTop: "4px",
+        padding: "2px 6px",
+        borderRadius: "4px",
+        fontSize: "10px",
+        fontWeight: "700",
+        color: "#166534",
+        background: "#dcfce7",
+        verticalAlign: "super",
+      }}
+    >
+      GOOGLE FORM
+    </span>
   )}
 </td>
+
 
 <td>{d.specialties?.name}</td>
 <td>{d.experience_years} yrs</td>
