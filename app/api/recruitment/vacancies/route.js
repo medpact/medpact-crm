@@ -33,7 +33,7 @@ export async function GET(request) {
     const requestedLimit = Number(searchParams.get("limit") || 0)
     const limit =
       Number.isInteger(requestedLimit) && requestedLimit > 0
-        ? Math.min(requestedLimit, 100)
+        ? Math.min(requestedLimit, 1000)
         : null
 
     let query = supabase
@@ -47,11 +47,15 @@ export async function GET(request) {
         city,
         state,
         location,
+        hospital_id,
         specialty_id,
         specialties(name)
       `)
       .ilike("status", "open")
-      .order("entry_date", { ascending: false, nullsFirst: false })
+      .order("entry_date", {
+        ascending: false,
+        nullsFirst: false,
+      })
       .order("created_at", { ascending: false })
 
     if (specialty) {
@@ -62,46 +66,102 @@ export async function GET(request) {
       query = query.ilike("city", `%${city}%`)
     }
 
-    if (state) {
-      query = query.ilike("state", `%${state}%`)
-    }
-
-    if (search) {
-      // Search the specialty and location fields after fetching the
-      // open requirements, so hospital details are never returned.
-      // The final search is applied to the safe public response fields.
-    }
-
+    // Fetch all matching open requirements first.
+    // State filtering is applied after resolving the hospital state.
     const { data, error } = await query
 
     if (error) {
       console.error("Recruitment vacancies query failed:", error.message)
+
       return NextResponse.json(
         { error: "Unable to load vacancies" },
         { status: 500 }
       )
     }
 
-    let vacancies = (data || []).map((item) => ({
-      id: item.id,
-      title: item.specialties?.name || "Medical Professional",
-      specialty: item.specialties?.name || "Not specified",
-      city: item.city || item.location || "",
-      state: item.state || "",
-      positions: item.positions ?? null,
-      experienceRequired: item.experience_required ?? null,
-      date: item.entry_date || item.created_at || null,
-    }))
+    const requirements = data || []
+
+    // Retrieve the state linked to each hospital.
+    // Hospital names are deliberately not selected or returned.
+    const hospitalIds = [
+      ...new Set(
+        requirements
+          .map((item) => item.hospital_id)
+          .filter((id) => id != null)
+      ),
+    ]
+
+    const hospitalStateMap = {}
+
+    if (hospitalIds.length > 0) {
+      const { data: hospitals, error: hospitalError } = await supabase
+        .from("hospitals")
+        .select(`
+          id,
+          states!fk_hospital_state(name)
+        `)
+        .in("id", hospitalIds)
+
+      if (hospitalError) {
+        console.error(
+          "Recruitment hospital state lookup failed:",
+          hospitalError.message
+        )
+
+        return NextResponse.json(
+          { error: "Unable to load vacancy locations" },
+          { status: 500 }
+        )
+      }
+
+      ;(hospitals || []).forEach((hospital) => {
+        hospitalStateMap[String(hospital.id)] =
+          hospital.states?.name || ""
+      })
+    }
+
+    let vacancies = requirements.map((item) => {
+      const requirementState = String(item.state || "").trim()
+      const hospitalState = String(
+        hospitalStateMap[String(item.hospital_id)] || ""
+      ).trim()
+
+      // Prefer the explicit requirement state when available.
+      // Otherwise use the hospital's linked state.
+      const resolvedState = requirementState || hospitalState
+
+      return {
+        id: item.id,
+        title: item.specialties?.name || "Medical Professional",
+        specialty: item.specialties?.name || "Not specified",
+        city: item.city || item.location || "",
+        state: resolvedState,
+        positions: item.positions ?? null,
+        experienceRequired: item.experience_required ?? null,
+        date: item.entry_date || item.created_at || null,
+      }
+    })
+
+    if (state) {
+      const term = state.toLowerCase()
+
+      vacancies = vacancies.filter((item) =>
+        item.state.toLowerCase().includes(term)
+      )
+    }
 
     if (search) {
       const term = search.toLowerCase()
+
       vacancies = vacancies.filter((item) =>
         [
           item.title,
           item.specialty,
           item.city,
           item.state,
-        ].some((value) => String(value || "").toLowerCase().includes(term))
+        ].some((value) =>
+          String(value || "").toLowerCase().includes(term)
+        )
       )
     }
 
@@ -120,7 +180,10 @@ export async function GET(request) {
       }
     )
   } catch (error) {
-    console.error("Recruitment vacancies API error:", error.message)
+    console.error(
+      "Recruitment vacancies API error:",
+      error.message
+    )
 
     return NextResponse.json(
       { error: "Unable to load vacancies" },
