@@ -200,7 +200,7 @@ export default function DoctorRegistrationPage() {
     setSubmitting(true)
 
     try {
-      const supabase = getSupabaseBrowserClient()
+      
 
       const selectedSpecialty = specialties.find(
         (item) => String(item.id) === String(form.specialty_id)
