@@ -58,7 +58,7 @@ function getWhatsAppLink(vacancy) {
     `Position: ${vacancy.title || "Not specified"}`,
     `Location: ${location}`,
     "",
-    "Please share the hospital name, salary/package, duty timings and other relevant details.",
+    "Please share the hospital details, salary/package, duty timings and other relevant details.",
     "",
     "Thank you.",
   ].join("\n")
