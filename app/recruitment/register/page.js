@@ -411,7 +411,7 @@ export default function DoctorRegistrationPage() {
                   autoComplete="name"
                   value={form.name}
                   onChange={(event) => updateField("name", event.target.value)}
-                  placeholder="e.g. Dr. Vidya Bhavani Mogili"
+                  placeholder="e.g. Dr. XXX XXXX"
                   style={inputStyle}
                 />
               </Field>
@@ -543,7 +543,7 @@ export default function DoctorRegistrationPage() {
                 <input
                   value={form.current_location}
                   onChange={(event) => updateField("current_location", event.target.value)}
-                  placeholder="e.g. Vijayawada"
+                  placeholder="e.g. Hyderabad"
                   style={inputStyle}
                 />
               </Field>
@@ -555,7 +555,7 @@ export default function DoctorRegistrationPage() {
                 <input
                   value={form.preferred_location}
                   onChange={(event) => updateField("preferred_location", event.target.value)}
-                  placeholder="e.g. Guntur, Hyderabad"
+                  placeholder="e.g. Vizag, Hyderabad"
                   style={inputStyle}
                 />
               </Field>
