@@ -409,7 +409,7 @@ export default function RecruitmentHomePage() {
       fontWeight: 700,
     }}
   >
-    Apply for Job →
+    Apply →
   </Link>
 </div>
 
