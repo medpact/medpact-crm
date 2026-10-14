@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -80,9 +81,7 @@ export default function HospitalsDirectoryPage() {
         }
 
         if (active) {
-          setHospitals(
-            (data || []).map(normalise)
-          )
+          setHospitals((data || []).map(normalise))
         }
       } catch (err) {
         if (active) {
@@ -105,11 +104,6 @@ export default function HospitalsDirectoryPage() {
     }
   }, [])
 
-  /*
-    Whenever the user searches, changes city,
-    changes hospital type or sorting, return
-    automatically to page 1.
-  */
   useEffect(() => {
     setCurrentPage(1)
   }, [query, city, type, sort])
@@ -199,27 +193,18 @@ export default function HospitalsDirectoryPage() {
     sort,
   ])
 
-  /*
-    PAGINATION
-    12 hospitals per page
-  */
-
   const totalPages = Math.ceil(
     filtered.length / hospitalsPerPage
   )
 
   const startIndex =
-    (currentPage - 1) *
-    hospitalsPerPage
+    (currentPage - 1) * hospitalsPerPage
 
   const endIndex =
     startIndex + hospitalsPerPage
 
   const paginatedHospitals =
-    filtered.slice(
-      startIndex,
-      endIndex
-    )
+    filtered.slice(startIndex, endIndex)
 
   return (
     <main
@@ -235,14 +220,13 @@ export default function HospitalsDirectoryPage() {
         <Link
           href="/medicalneeds"
           className="brand"
+          aria-label="Medpact Medical Tourism home"
         >
-          <span className="brandMark">
-            M
-          </span>
-
-          <span>
-            Medpact <b>Care</b>
-          </span>
+          <img
+            src="/medicalneeds/medpact-medical-tourism-logo.png"
+            alt="Medpact Medical Tourism"
+            className="brandLogo"
+          />
         </Link>
 
         <nav>
@@ -464,9 +448,7 @@ export default function HospitalsDirectoryPage() {
                 onClick={() => {
                   setQuery("")
                   setCity("All cities")
-                  setType(
-                    "All hospital types"
-                  )
+                  setType("All hospital types")
                 }}
               >
                 Clear filters
@@ -508,148 +490,117 @@ export default function HospitalsDirectoryPage() {
               {/* GRID */}
 
               <div className="hospitalGrid">
-                {paginatedHospitals.map(
-                  (h) => {
-                    const slug =
-                      h.slug ||
-                      toSlug(h.name)
+                {paginatedHospitals.map((h) => {
+                  const slug =
+                    h.slug || toSlug(h.name)
 
-                    const image =
-                      h.images?.[0] || ""
+                  const image =
+                    h.images?.[0] || ""
 
-                    const procedures =
-                      h.keyProcedures || []
+                  const procedures =
+                    h.keyProcedures || []
 
-                    const chips = [
-                      ...(h.accreditations ||
-                        []),
-                      ...(h.keySpecialties ||
-                        []),
-                    ].slice(0, 3)
+                  const chips = [
+                    ...(h.accreditations || []),
+                    ...(h.keySpecialties || []),
+                  ].slice(0, 3)
 
-                    return (
-                      <article
-                        className="hospitalCard"
-                        key={h.id}
-                      >
-                        {/* PHOTO */}
+                  return (
+                    <article
+                      className="hospitalCard"
+                      key={h.id}
+                    >
+                      {/* PHOTO */}
 
-                        <div className="photo">
-                          <div className="photoPattern">
-                            +
-                          </div>
-
-                          {image && (
-                            <img
-                              src={image}
-                              alt={h.name}
-                              loading="lazy"
-                            />
-                          )}
-
-                          <div className="badges">
-                            {h.verified && (
-                              <span className="verified">
-                                ✓ Verified
-                              </span>
-                            )}
-
-                            {h.featured && (
-                              <span className="featured">
-                                Featured
-                              </span>
-                            )}
-                          </div>
+                      <div className="photo">
+                        <div className="photoPattern">
+                          +
                         </div>
 
-                        {/* CARD CONTENT */}
+                        {image && (
+                          <img
+                            src={image}
+                            alt={h.name}
+                            loading="lazy"
+                          />
+                        )}
 
-                        <div className="body">
-                          <div className="top">
-                            <span>
-                              {h.hospitalType ||
-                                "Hospital"}
+                        <div className="badges">
+                          {h.verified && (
+                            <span className="verified">
+                              ✓ Verified
                             </span>
-                          </div>
+                          )}
 
-                          <h2>
-                            {h.name}
-                          </h2>
+                          {h.featured && (
+                            <span className="featured">
+                              Featured
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                          <p className="location">
-                            ⌖{" "}
-                            {h.city ||
-                              "India"}
-                            {h.state
-                              ? `, ${h.state}`
-                              : ""}
+                      {/* CARD CONTENT */}
+
+                      <div className="body">
+                        <div className="top">
+                          <span>
+                            {h.hospitalType || "Hospital"}
+                          </span>
+                        </div>
+
+                        <h2>{h.name}</h2>
+
+                        <p className="location">
+                          ⌖{" "}
+                          {h.city || "India"}
+                          {h.state ? `, ${h.state}` : ""}
+                        </p>
+
+                        {h.description && (
+                          <p className="summary">
+                            {shortText(h.description)}
                           </p>
+                        )}
 
-                          {h.description && (
-                            <p className="summary">
-                              {shortText(
-                                h.description
-                              )}
-                            </p>
-                          )}
-
-                          {chips.length >
-                            0 && (
-                            <div className="chips">
-                              {chips.map(
-                                (
-                                  x,
-                                  index
-                                ) => (
-                                  <span
-                                    key={`${x}-${index}`}
-                                  >
-                                    {x}
-                                  </span>
-                                )
-                              )}
-                            </div>
-                          )}
-
-                          {procedures.length >
-                            0 && (
-                            <div className="procedureHint">
-                              <span>
-                                Procedures
+                        {chips.length > 0 && (
+                          <div className="chips">
+                            {chips.map((x, index) => (
+                              <span key={`${x}-${index}`}>
+                                {x}
                               </span>
+                            ))}
+                          </div>
+                        )}
 
-                              <b>
-                                {procedures
-                                  .slice(
-                                    0,
-                                    2
-                                  )
-                                  .join(
-                                    " · "
-                                  )}
-                              </b>
-                            </div>
-                          )}
+                        {procedures.length > 0 && (
+                          <div className="procedureHint">
+                            <span>Procedures</span>
 
-                          {/* VIEW MORE */}
+                            <b>
+                              {procedures
+                                .slice(0, 2)
+                                .join(" · ")}
+                            </b>
+                          </div>
+                        )}
 
-                          <Link
-                            href={`/medicalneeds/hospitals/${slug}`}
-                            className="view"
-                          >
-                            <span>
-                              View more
-                            </span>
+                        {/* VIEW MORE */}
 
-                            <span className="arrow">
-                              →
-                            </span>
-                          </Link>
-                        </div>
-                      </article>
-                    )
-                  }
-                )}
+                        <Link
+                          href={`/medicalneeds/hospitals/${slug}`}
+                          className="view"
+                        >
+                          <span>View more</span>
+
+                          <span className="arrow">
+                            →
+                          </span>
+                        </Link>
+                      </div>
+                    </article>
+                  )
+                })}
               </div>
 
               {/* PAGINATION */}
@@ -658,16 +609,10 @@ export default function HospitalsDirectoryPage() {
                 <div className="pagination">
                   <button
                     type="button"
-                    disabled={
-                      currentPage === 1
-                    }
+                    disabled={currentPage === 1}
                     onClick={() =>
-                      setCurrentPage(
-                        (page) =>
-                          Math.max(
-                            1,
-                            page - 1
-                          )
+                      setCurrentPage((page) =>
+                        Math.max(1, page - 1)
                       )
                     }
                   >
@@ -676,26 +621,19 @@ export default function HospitalsDirectoryPage() {
 
                   <div className="pageNumbers">
                     {Array.from(
-                      {
-                        length:
-                          totalPages,
-                      },
-                      (_, index) =>
-                        index + 1
+                      { length: totalPages },
+                      (_, index) => index + 1
                     ).map((page) => (
                       <button
                         type="button"
                         key={page}
                         className={
-                          currentPage ===
-                          page
+                          currentPage === page
                             ? "active"
                             : ""
                         }
                         onClick={() =>
-                          setCurrentPage(
-                            page
-                          )
+                          setCurrentPage(page)
                         }
                       >
                         {page}
@@ -705,17 +643,10 @@ export default function HospitalsDirectoryPage() {
 
                   <button
                     type="button"
-                    disabled={
-                      currentPage ===
-                      totalPages
-                    }
+                    disabled={currentPage === totalPages}
                     onClick={() =>
-                      setCurrentPage(
-                        (page) =>
-                          Math.min(
-                            totalPages,
-                            page + 1
-                          )
+                      setCurrentPage((page) =>
+                        Math.min(totalPages, page + 1)
                       )
                     }
                   >
@@ -756,14 +687,13 @@ export default function HospitalsDirectoryPage() {
         <Link
           href="/medicalneeds"
           className="brand"
+          aria-label="Medpact Medical Tourism home"
         >
-          <span className="brandMark">
-            M
-          </span>
-
-          <span>
-            Medpact <b>Care</b>
-          </span>
+          <img
+            src="/medicalneeds/medpact-medical-tourism-logo.png"
+            alt="Medpact Medical Tourism"
+            className="brandLogo"
+          />
         </Link>
 
         <span>
@@ -816,10 +746,23 @@ body{
   display:flex;
   gap:10px;
   align-items:center;
+  min-width:0;
   color:var(--ink);
   font-weight:700;
   text-decoration:none;
   letter-spacing:-.03em;
+}
+
+.brandLogo{
+  display:block;
+  width:auto;
+  height:48px;
+  max-width:240px;
+  object-fit:contain;
+}
+
+.nav .brandLogo{
+  max-width:240px;
 }
 
 .brand b{
@@ -992,8 +935,7 @@ body{
 
 .hospitalGrid{
   display:grid;
-  grid-template-columns:
-    repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(3,minmax(0,1fr));
   gap:18px;
 }
 
@@ -1003,28 +945,19 @@ body{
   border-radius:18px;
   overflow:hidden;
   min-width:0;
-  transition:
-    transform .2s ease,
-    box-shadow .2s ease,
-    border-color .2s ease;
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
 }
 
 .hospitalCard:hover{
   transform:translateY(-3px);
   border-color:#cbd9d4;
-  box-shadow:
-    0 16px 38px rgba(18,32,29,.08);
+  box-shadow:0 16px 38px rgba(18,32,29,.08);
 }
 
 .photo{
   position:relative;
   height:190px;
-  background:
-    linear-gradient(
-      145deg,
-      #dcebe5,
-      #f6f8f5
-    );
+  background:linear-gradient(145deg,#dcebe5,#f6f8f5);
   overflow:hidden;
 }
 
@@ -1367,12 +1300,15 @@ footer .brand{
   font-size:14px;
 }
 
+footer .brandLogo{
+  height:42px;
+}
+
 /* TABLET */
 
 @media(max-width:1050px){
   .hospitalGrid{
-    grid-template-columns:
-      repeat(2,minmax(0,1fr));
+    grid-template-columns:repeat(2,minmax(0,1fr));
   }
 }
 
@@ -1392,6 +1328,11 @@ footer .brand{
     padding:10px 12px;
   }
 
+  .nav .brandLogo{
+    height:40px;
+    max-width:190px;
+  }
+
   .hero{
     padding-top:52px;
   }
@@ -1409,8 +1350,7 @@ footer .brand{
 
   .filters{
     display:grid;
-    grid-template-columns:
-      repeat(2,minmax(0,1fr));
+    grid-template-columns:repeat(2,minmax(0,1fr));
   }
 
   .toolbar select{
@@ -1443,6 +1383,10 @@ footer .brand{
   footer{
     flex-direction:column;
     align-items:flex-start;
+  }
+
+  footer .brandLogo{
+    height:36px;
   }
 }
 
