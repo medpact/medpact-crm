@@ -37,7 +37,8 @@ const menu=[
 {label:"Hospitals",href:"/hospitals",icon:"🏥"},
 {label:"Requirements",href:"/requirements",icon:"📋"},
 {label:"Pipeline",href:"/shortlists",icon:"🎯"},
-{label:"Placements",href:"/placements",icon:"✅"}
+{label:"Placements",href:"/placements",icon:"✅"},
+{label:"Generate Poster",href:"/requirements/poster",icon:"🎨"}
 ]
 
 const masters=[
