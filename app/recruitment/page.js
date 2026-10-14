@@ -78,59 +78,94 @@ export default function RecruitmentHomePage() {
 
   return (
     <main style={styles.page}>
-      <header style={{ borderBottom: "1px solid #e8edf3" }}>
-        <div style={{
-          ...styles.container,
-          minHeight: 82,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 20,
-          flexWrap: "wrap",
-        }}>
-          <Link href="/" style={{
-            fontSize: 25,
-            fontWeight: 800,
-            letterSpacing: "-1px",
-            color: "#10233f",
-            textDecoration: "none",
-          }}>
-            <img
-  src="/medpact-recruitment-logo.png"
-  alt="Medpact Healthcare Private Limited"
+   
+<header
   style={{
-    display: "block",
-    width: "230px",
-    maxWidth: "100%",
-    height: "auto",
-    objectFit: "contain",
+    position: "sticky",
+    top: 0,
+    zIndex: 50,
+    background: "rgba(255,255,255,0.96)",
+    backdropFilter: "blur(14px)",
+    borderBottom: "1px solid #e8edf3",
   }}
-/>
-            <div style={{
-              fontSize: 10,
-              letterSpacing: 2,
-              color: "#65758b",
-              marginTop: 3,
-            }}>
-              DOCTORS NETWORK
-            </div>
-          </Link>
+>
+  <div
+    style={{
+      ...styles.container,
+      minHeight: 88,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 24,
+      flexWrap: "wrap",
+      paddingTop: 10,
+      paddingBottom: 10,
+      boxSizing: "border-box",
+    }}
+  >
+    <Link
+      href="/"
+      aria-label="Medpact Doctors Network home"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexShrink: 0,
+        textDecoration: "none",
+      }}
+    >
+      <img
+        src="/medpact-recruitment-logo.png"
+        alt="Medpact Healthcare Private Limited"
+        style={{
+          display: "block",
+          width: "clamp(165px, 19vw, 225px)",
+          maxWidth: "100%",
+          height: "auto",
+          maxHeight: 68,
+          objectFit: "contain",
+        }}
+      />
+    </Link>
 
-          <nav style={{
-            display: "flex",
-            gap: 20,
-            alignItems: "center",
-            flexWrap: "wrap",
-            fontSize: 14,
-          }}>
-            <Link href="/vacancies" style={{ color: "#34465e" }}>Find Jobs</Link>
-            <Link href="/register" style={{ color: "#34465e" }}>Doctor Registration</Link>
-            <Link href="/about" style={{ color: "#34465e" }}>About</Link>
-            <Link href="/contact" style={{ color: "#34465e" }}>Contact</Link>
-            <Link href="/register" style={styles.button}>Join Medpact</Link>
-          </nav>
-        </div>
-      </header>
+    <nav
+      aria-label="Main navigation"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "clamp(12px, 2vw, 26px)",
+        flexWrap: "wrap",
+        fontSize: 14,
+        fontWeight: 600,
+      }}
+    >
+      <Link href="/vacancies" style={{ color: "#34465e", textDecoration: "none" }}>
+        Find Jobs
+      </Link>
+      <Link href="/register" style={{ color: "#34465e", textDecoration: "none" }}>
+        Doctor Registration
+      </Link>
+      <Link href="/about" style={{ color: "#34465e", textDecoration: "none" }}>
+        About
+      </Link>
+      <Link href="/contact" style={{ color: "#34465e", textDecoration: "none" }}>
+        Contact
+      </Link>
+      <Link
+        href="/register"
+        style={{
+          ...styles.button,
+          padding: "12px 19px",
+          borderRadius: 10,
+          whiteSpace: "nowrap",
+        }}
+      >
+        Join Medpact
+      </Link>
+    </nav>
+  </div>
+</header>
+
 
       <section style={{
         background: "radial-gradient(circle at 85% 15%, #d9f5f0 0, transparent 35%), linear-gradient(120deg, #f5f9fd, #fff 70%)",
