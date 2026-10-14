@@ -392,6 +392,27 @@ export default function RecruitmentHomePage() {
                     fontSize: 12,
                   }}>
                     Listed {formatDate(vacancy.date)}
+
+<div style={{ marginTop: 18 }}>
+  <Link
+    href="/register"
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "9px 14px",
+      borderRadius: 8,
+      background: "#087e8b",
+      color: "#fff",
+      textDecoration: "none",
+      fontSize: 13,
+      fontWeight: 700,
+    }}
+  >
+    Apply for Job →
+  </Link>
+</div>
+
                   </div>
                 </article>
               ))}
