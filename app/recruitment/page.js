@@ -50,7 +50,7 @@ export default function RecruitmentHomePage() {
     async function loadVacancies() {
       try {
         const response = await fetch(
-          "/api/recruitment/vacancies?limit=10",
+          "/api/recruitment/vacancies?limit=9",
           { cache: "no-store" }
         )
 
