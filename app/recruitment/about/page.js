@@ -136,28 +136,19 @@ export default function AboutPage() {
             flexWrap: "wrap",
           }}
         >
-          <Link
-            href="/"
-            style={{
-              color: C.navy,
-              textDecoration: "none",
-              fontSize: 27,
-              fontWeight: 800,
-              letterSpacing: "-1px",
-            }}
-          >
-            medpact<span style={{ color: C.teal }}>.</span>
-            <div
-              style={{
-                fontSize: 10,
-                letterSpacing: 2,
-                color: C.muted,
-                marginTop: 3,
-              }}
-            >
-              DOCTORS NETWORK
-            </div>
-          </Link>
+          <Link href="/" style={{ display: "inline-flex", alignItems: "center" }}>
+  <img
+    src="/medpact-recruitment-logo.png"
+    alt="Medpact Healthcare Private Limited"
+    style={{
+      display: "block",
+      width: "190px",
+      maxWidth: "100%",
+      height: "auto",
+      objectFit: "contain",
+    }}
+  />
+</Link>
 
           <nav
             aria-label="Main navigation"
