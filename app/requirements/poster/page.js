@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -10,33 +9,139 @@ const PHONE = "+91 95426 67667"
 const EMAIL = "info@medpact.in"
 const WEBSITE = "www.medpact.in"
 
-const NAVY = "#073B67"
-const BLUE = "#0878B9"
-const GREEN = "#49AF35"
-const PALE = "#EAF6FC"
-const INK = "#153653"
-
-function escapeXml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;")
+const C = {
+  navy: "#073B67",
+  blue: "#0878B9",
+  teal: "#16A6A1",
+  green: "#49AF35",
+  pale: "#EAF6FC",
+  ink: "#153653",
+  white: "#FFFFFF",
 }
 
+/*
+  These are starter stock-image URLs.
+  For reliable production use, download approved images of Indian doctors
+  and store them in public/poster-doctors/.
+*/
+const TEMPLATES = [
+  {
+    id: "surgical",
+    name: "Surgical specialties",
+    description:
+      "Orthopedics, General Surgery, Neurosurgery, Hand Microsurgery, Urology",
+    image:
+      "https://images.unsplash.com/photo-1551601651-2a8555f1a136?auto=format&fit=crop&w=1000&q=85",
+    keywords: [
+      "orthopedic",
+      "orthopaedic",
+      "surgery",
+      "surgeon",
+      "neurosurgery",
+      "microsurgery",
+      "urology",
+      "surgical",
+      "transplant",
+    ],
+    accent: C.blue,
+    visual: "SURGICAL CARE",
+  },
+  {
+    id: "radiology",
+    name: "Radiology",
+    description:
+      "Radiology, Interventional Radiology, Nuclear Medicine",
+    image:
+      "https://images.unsplash.com/photo-1511174511562-5f7f18b874f8?auto=format&fit=crop&w=1000&q=85",
+    keywords: [
+      "radiology",
+      "radiologist",
+      "nuclear medicine",
+      "imaging",
+    ],
+    accent: C.blue,
+    visual: "MEDICAL IMAGING",
+  },
+  {
+    id: "cardiology",
+    name: "Cardiology",
+    description:
+      "Cardiology, Cardiac Surgery and related specialties",
+    image:
+      "https://images.unsplash.com/photo-1628348068343-c6a848d2b6dd?auto=format&fit=crop&w=1000&q=85",
+    keywords: [
+      "cardiology",
+      "cardiac",
+      "cardiothoracic",
+      "heart",
+    ],
+    accent: C.green,
+    visual: "HEART CARE",
+  },
+  {
+    id: "pediatrics",
+    name: "Pediatrics",
+    description:
+      "Pediatrics, Neonatology, Pediatric Surgery",
+    image:
+      "https://images.unsplash.com/photo-1632053002928-191d2b4b8f84?auto=format&fit=crop&w=1000&q=85",
+    keywords: [
+      "pediatric",
+      "paediatric",
+      "pediatrics",
+      "paediatrics",
+      "neonatology",
+      "child",
+    ],
+    accent: C.green,
+    visual: "CARE FOR EVERY CHILD",
+  },
+  {
+    id: "womens-health",
+    name: "Women's health",
+    description:
+      "Gynecology, Obstetrics, Reproductive Medicine",
+    image:
+      "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1000&q=85",
+    keywords: [
+      "gynecology",
+      "gynaecology",
+      "obstetric",
+      "reproductive",
+      "maternal",
+      "women",
+    ],
+    accent: "#0D8E9A",
+    visual: "WOMEN'S HEALTH",
+  },
+  {
+    id: "standard",
+    name: "Standard doctor",
+    description: "All other specialties",
+    image:
+      "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=1000&q=85",
+    keywords: [],
+    accent: C.blue,
+    visual: "BETTER CARE, TOGETHER",
+  },
+]
+
 function displayValue(value, fallback = "Not specified") {
-  return value === null || value === undefined || value === ""
+  return value === null ||
+    value === undefined ||
+    String(value).trim() === ""
     ? fallback
     : String(value)
 }
 
 function experienceText(value) {
   if (value === null || value === undefined || value === "") {
-    return "Experience as per profile"
+    return "As per profile"
   }
 
-  return `${value} ${Number(value) === 1 ? "year" : "years"}`
+  const n = Number(value)
+
+  return `${value} ${n === 1 ? "year" : "years"}`
 }
 
 function salaryText(requirement) {
@@ -47,169 +152,398 @@ function salaryText(requirement) {
     return `₹${Number(min).toLocaleString("en-IN")} – ₹${Number(max).toLocaleString("en-IN")}`
   }
 
-  if (min) return `From ₹${Number(min).toLocaleString("en-IN")}`
-  if (max) return `Up to ₹${Number(max).toLocaleString("en-IN")}`
+  if (min) {
+    return `From ₹${Number(min).toLocaleString("en-IN")}`
+  }
+
+  if (max) {
+    return `Up to ₹${Number(max).toLocaleString("en-IN")}`
+  }
 
   return ""
 }
 
-function makePosterSvg(type, requirements, includeSalary) {
-  const single = type === "single"
+function chooseTemplate(specialtyName) {
+  const name = String(specialtyName || "").toLowerCase()
+
+  return (
+    TEMPLATES.find(
+      (template) =>
+        template.id !== "standard" &&
+        template.keywords.some((word) => name.includes(word))
+    ) || TEMPLATES[TEMPLATES.length - 1]
+  )
+}
+
+function xml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;")
+}
+
+function wrapText(value, max = 24) {
+  const words = String(value || "").split(/\s+/)
+  const lines = []
+  let line = ""
+
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word
+
+    if (next.length > max && line) {
+      lines.push(line)
+      line = word
+    } else {
+      line = next
+    }
+  }
+
+  if (line) lines.push(line)
+
+  return lines.slice(0, 2)
+}
+
+function makePosterSvg(requirement, template, includeSalary) {
   const W = 1080
   const H = 1350
 
-  const selected = single ? requirements.slice(0, 1) : requirements.slice(0, 6)
+  const specialty = String(requirement.specialty_name || "Doctor")
+  const city = String(requirement.city || "Location to be confirmed")
+  const experience = experienceText(requirement.experience_required)
+  const lines = wrapText(specialty.toUpperCase(), 22)
 
-  const title = single
-    ? displayValue(selected[0]?.specialty_name, "Doctor")
-    : "DOCTOR OPPORTUNITIES"
-
-  const header = `
-    <rect width="${W}" height="${H}" rx="32" fill="#ffffff"/>
-    <rect width="${W}" height="22" fill="${GREEN}"/>
-    <rect y="22" width="${W}" height="8" fill="${BLUE}"/>
-
-    <image href="${LOGO_URL}" x="48" y="48" width="400" height="120" preserveAspectRatio="xMinYMid meet"/>
-
-    <text x="1032" y="70" text-anchor="end" font-family="Arial,sans-serif"
-      font-size="24" font-weight="700" fill="${NAVY}">TRUSTED NETWORK</text>
-    <text x="1032" y="108" text-anchor="end" font-family="Arial,sans-serif"
-      font-size="22" fill="${GREEN}">CAREER OPPORTUNITIES</text>
-
-    <path d="M0 205 Q280 155 530 205 T1080 190 L1080 280 L0 280 Z" fill="${PALE}"/>
-  `
-
-  let body = ""
-
-  if (single && selected.length) {
-    const r = selected[0]
-    const specialty = escapeXml(r.specialty_name || "Doctor")
-    const city = escapeXml(displayValue(r.city, "Location not specified"))
-    const qualification = escapeXml(displayValue(r.qualification, "As per specialty"))
-    const experience = escapeXml(experienceText(r.experience_required))
-    const facility = "Healthcare Facility"
-
-    body = `
-      <text x="58" y="250" font-family="Arial,sans-serif" font-size="36"
-        font-weight="700" fill="${BLUE}">WE ARE</text>
-      <text x="55" y="350" font-family="Arial,sans-serif" font-size="96"
-        font-weight="900" fill="${GREEN}">HIRING</text>
-
-      <rect x="48" y="380" width="984" height="154" rx="30" fill="${NAVY}"/>
-      <text x="84" y="475" font-family="Arial,sans-serif" font-size="64"
-        font-weight="800" fill="#ffffff">${specialty.length > 23 ? specialty.slice(0, 23) + "…" : specialty}</text>
-      <text x="86" y="515" font-family="Arial,sans-serif" font-size="24"
-        font-weight="600" fill="#BFE5FF">JOIN OUR HEALTHCARE NETWORK</text>
-
-      <rect x="48" y="565" width="984" height="385" rx="28" fill="${PALE}"/>
-      <circle cx="112" cy="645" r="34" fill="${BLUE}"/>
-      <text x="112" y="657" text-anchor="middle" font-family="Arial,sans-serif"
-        font-size="32" font-weight="700" fill="#ffffff">✓</text>
-      <text x="172" y="633" font-family="Arial,sans-serif" font-size="23"
-        fill="${BLUE}" font-weight="700">QUALIFICATION</text>
-      <text x="172" y="674" font-family="Arial,sans-serif" font-size="34"
-        fill="${INK}" font-weight="700">${qualification.slice(0, 36)}</text>
-      <line x1="172" y1="699" x2="970" y2="699" stroke="#B5D9EC" stroke-width="2"/>
-
-      <circle cx="112" cy="752" r="34" fill="${BLUE}"/>
-      <text x="112" y="764" text-anchor="middle" font-family="Arial,sans-serif"
-        font-size="32" font-weight="700" fill="#ffffff">+</text>
-      <text x="172" y="742" font-family="Arial,sans-serif" font-size="23"
-        fill="${BLUE}" font-weight="700">EXPERIENCE</text>
-      <text x="172" y="784" font-family="Arial,sans-serif" font-size="34"
-        fill="${INK}" font-weight="700">${escapeXml(experience)}</text>
-      <line x1="172" y1="809" x2="970" y2="809" stroke="#B5D9EC" stroke-width="2"/>
-
-      <circle cx="112" cy="863" r="34" fill="${GREEN}"/>
-      <text x="112" y="875" text-anchor="middle" font-family="Arial,sans-serif"
-        font-size="32" font-weight="700" fill="#ffffff">⌖</text>
-      <text x="172" y="852" font-family="Arial,sans-serif" font-size="23"
-        fill="${BLUE}" font-weight="700">WORK LOCATION</text>
-      <text x="172" y="895" font-family="Arial,sans-serif" font-size="34"
-        fill="${INK}" font-weight="700">${city.slice(0, 35)}</text>
-
-      ${includeSalary && salaryText(r) ? `
-        <rect x="48" y="970" width="984" height="70" rx="20" fill="#EAF7E7"/>
-        <text x="540" y="1014" text-anchor="middle" font-family="Arial,sans-serif"
-          font-size="28" font-weight="700" fill="${GREEN}">Salary: ${escapeXml(salaryText(r))}</text>
-      ` : ""}
-
-      <rect x="48" y="${includeSalary && salaryText(r) ? 1060 : 970}" width="984" height="110" rx="24" fill="${GREEN}"/>
-      <text x="540" y="${includeSalary && salaryText(r) ? 1105 : 1015}" text-anchor="middle"
-        font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#ffffff">INTERESTED? LET'S CONNECT</text>
-      <text x="540" y="${includeSalary && salaryText(r) ? 1145 : 1055}" text-anchor="middle"
-        font-family="Arial,sans-serif" font-size="24" fill="#ffffff">Share this opportunity or refer a colleague</text>
-    `
-  } else {
-    const cards = selected.map((r, index) => {
-      const col = index % 2
-      const row = Math.floor(index / 2)
-      const x = 48 + col * 500
-      const y = 300 + row * 245
-      const specialty = escapeXml(displayValue(r.specialty_name, "Doctor"))
-      const city = escapeXml(displayValue(r.city, "Location not specified"))
-      const qual = escapeXml(displayValue(r.qualification, "As per specialty"))
-      const exp = escapeXml(experienceText(r.experience_required))
-      const positions = escapeXml(displayValue(r.positions, "Multiple"))
-      const salary = includeSalary ? salaryText(r) : ""
-
-      return `
-        <rect x="${x}" y="${y}" width="480" height="220" rx="24"
-          fill="${index % 2 ? "#F2FAEF" : "#EFF8FD"}"
-          stroke="${index % 2 ? "#B8E3AD" : "#B7DDF2"}" stroke-width="2"/>
-        <rect x="${x}" y="${y}" width="12" height="220" rx="6" fill="${index % 2 ? GREEN : BLUE}"/>
-        <text x="${x + 32}" y="${y + 47}" font-family="Arial,sans-serif"
-          font-size="${specialty.length > 23 ? 24 : 29}" font-weight="800" fill="${NAVY}">${specialty.slice(0, 27)}</text>
-        <rect x="${x + 330}" y="${y + 20}" width="125" height="38" rx="18" fill="${index % 2 ? "#D8F1D1" : "#D6ECFA"}"/>
-        <text x="${x + 392}" y="${y + 46}" text-anchor="middle" font-family="Arial,sans-serif"
-          font-size="19" font-weight="700" fill="${NAVY}">${positions} pos.</text>
-        <text x="${x + 32}" y="${y + 91}" font-family="Arial,sans-serif"
-          font-size="21" font-weight="700" fill="${GREEN}">⌖ ${city.slice(0, 30)}</text>
-        <text x="${x + 32}" y="${y + 130}" font-family="Arial,sans-serif"
-          font-size="19" fill="${INK}">Qualification: ${qual.slice(0, 25)}</text>
-        <text x="${x + 32}" y="${y + 164}" font-family="Arial,sans-serif"
-          font-size="19" fill="${INK}">Experience: ${exp.slice(0, 24)}</text>
-        ${salary ? `<text x="${x + 32}" y="${y + 196}" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="${GREEN}">${escapeXml(salary).slice(0, 40)}</text>` : ""}
+  const titleSvg = lines
+    .map(
+      (line, i) => `
+        <text
+          x="64"
+          y="${365 + i * 68}"
+          font-family="Arial,sans-serif"
+          font-size="${lines.length > 1 ? 52 : 62}"
+          font-weight="900"
+          fill="${C.white}"
+        >${xml(line)}</text>
       `
-    }).join("")
+    )
+    .join("")
 
-    body = `
-      <text x="54" y="235" font-family="Arial,sans-serif" font-size="34"
-        font-weight="700" fill="${BLUE}">CAREER OPPORTUNITIES</text>
-      <text x="50" y="286" font-family="Arial,sans-serif" font-size="49"
-        font-weight="900" fill="${NAVY}">DOCTOR HIRING</text>
-      ${cards}
-      <text x="540" y="1060" text-anchor="middle" font-family="Arial,sans-serif"
-        font-size="28" font-weight="700" fill="${GREEN}">YOUR NEXT CAREER MOVE STARTS HERE</text>
-      <text x="540" y="1100" text-anchor="middle" font-family="Arial,sans-serif"
-        font-size="22" fill="${INK}">Interested or know a suitable candidate? Refer a colleague.</text>
+  const salary = includeSalary ? salaryText(requirement) : ""
+
+  const salaryBlock = salary
+    ? `
+      <rect
+        x="58"
+        y="1014"
+        width="964"
+        height="60"
+        rx="18"
+        fill="#EAF7E7"
+      />
+      <text
+        x="540"
+        y="1053"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="26"
+        font-weight="700"
+        fill="${C.green}"
+      >Salary: ${xml(salary)}</text>
     `
-  }
+    : ""
 
-  const footer = `
-    <path d="M0 1180 Q270 1140 540 1180 T1080 1170 L1080 1350 L0 1350 Z" fill="${NAVY}"/>
-    <rect x="48" y="1200" width="984" height="112" rx="22" fill="#ffffff"/>
-    <text x="540" y="1232" text-anchor="middle" font-family="Arial,sans-serif"
-      font-size="20" font-weight="700" fill="${GREEN}">CONTACT MEDPACT</text>
-    <text x="540" y="1272" text-anchor="middle" font-family="Arial,sans-serif"
-      font-size="27" font-weight="700" fill="${NAVY}">${PHONE}</text>
-    <text x="540" y="1303" text-anchor="middle" font-family="Arial,sans-serif"
-      font-size="20" fill="${INK}">${EMAIL}  |  ${WEBSITE}</text>
-  `
+  const ctaY = salary ? 1090 : 1025
+  const ctaTextY = salary ? 1132 : 1067
+  const ctaSubY = salary ? 1167 : 1102
+
+  const imageUrl = xml(template.image)
 
   return `
-    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-      width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      width="${W}"
+      height="${H}"
+      viewBox="0 0 ${W} ${H}"
+    >
       <defs>
         <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#ffffff"/>
-          <stop offset="100%" stop-color="${PALE}"/>
+          <stop offset="0%" stop-color="#FFFFFF"/>
+          <stop offset="100%" stop-color="${C.pale}"/>
         </linearGradient>
+
+        <linearGradient id="photoFade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="${C.navy}" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="${C.navy}" stop-opacity="0"/>
+        </linearGradient>
+
+        <clipPath id="photoClip">
+          <rect x="565" y="180" width="515" height="690" rx="34"/>
+        </clipPath>
       </defs>
+
       <rect width="${W}" height="${H}" fill="url(#bg)"/>
-      ${header}
-      ${body}
-      ${footer}
+
+      <rect width="${W}" height="18" fill="${C.green}"/>
+      <rect y="18" width="${W}" height="8" fill="${C.blue}"/>
+
+      <image
+        href="${LOGO_URL}"
+        x="48"
+        y="42"
+        width="405"
+        height="118"
+        preserveAspectRatio="xMinYMid meet"
+      />
+
+      <text
+        x="1030"
+        y="70"
+        text-anchor="end"
+        font-family="Arial,sans-serif"
+        font-size="23"
+        font-weight="800"
+        fill="${C.navy}"
+      >TRUSTED NETWORK</text>
+
+      <text
+        x="1030"
+        y="105"
+        text-anchor="end"
+        font-family="Arial,sans-serif"
+        font-size="20"
+        fill="${C.green}"
+      >CAREER OPPORTUNITIES</text>
+
+      <path
+        d="M0 170 Q260 115 520 170 T1080 150 L1080 230 L0 230Z"
+        fill="#DDF1FB"
+      />
+
+      <text
+        x="58"
+        y="220"
+        font-family="Arial,sans-serif"
+        font-size="34"
+        font-weight="800"
+        fill="${C.blue}"
+      >WE ARE</text>
+
+      <text
+        x="54"
+        y="305"
+        font-family="Arial,sans-serif"
+        font-size="88"
+        font-weight="900"
+        fill="${C.green}"
+      >HIRING</text>
+
+      <rect
+        x="48"
+        y="335"
+        width="984"
+        height="215"
+        rx="30"
+        fill="${C.navy}"
+      />
+
+      <rect
+        x="48"
+        y="335"
+        width="12"
+        height="215"
+        rx="6"
+        fill="${template.accent}"
+      />
+
+      ${titleSvg}
+
+      <text
+        x="68"
+        y="520"
+        font-family="Arial,sans-serif"
+        font-size="23"
+        font-weight="700"
+        fill="#BFE5FF"
+      >${xml(template.visual)}</text>
+
+      <g clip-path="url(#photoClip)">
+        <image
+          href="${imageUrl}"
+          x="565"
+          y="180"
+          width="515"
+          height="690"
+          preserveAspectRatio="xMidYMid slice"
+        />
+        <rect
+          x="565"
+          y="180"
+          width="515"
+          height="690"
+          fill="url(#photoFade)"
+        />
+      </g>
+
+      <rect
+        x="48"
+        y="585"
+        width="984"
+        height="365"
+        rx="30"
+        fill="${C.pale}"
+      />
+
+      <circle cx="112" cy="665" r="36" fill="${C.blue}"/>
+
+      <text
+        x="112"
+        y="677"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="32"
+        font-weight="700"
+        fill="#FFFFFF"
+      >+</text>
+
+      <text
+        x="174"
+        y="653"
+        font-family="Arial,sans-serif"
+        font-size="23"
+        font-weight="800"
+        fill="${C.blue}"
+      >EXPERIENCE</text>
+
+      <text
+        x="174"
+        y="699"
+        font-family="Arial,sans-serif"
+        font-size="36"
+        font-weight="800"
+        fill="${C.ink}"
+      >${xml(experience)}</text>
+
+      <line
+        x1="174"
+        y1="722"
+        x2="970"
+        y2="722"
+        stroke="#B5D9EC"
+        stroke-width="2"
+      />
+
+      <circle cx="112" cy="795" r="36" fill="${C.green}"/>
+
+      <text
+        x="112"
+        y="808"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="34"
+        font-weight="700"
+        fill="#FFFFFF"
+      >⌖</text>
+
+      <text
+        x="174"
+        y="783"
+        font-family="Arial,sans-serif"
+        font-size="23"
+        font-weight="800"
+        fill="${C.blue}"
+      >WORK LOCATION</text>
+
+      <text
+        x="174"
+        y="829"
+        font-family="Arial,sans-serif"
+        font-size="36"
+        font-weight="800"
+        fill="${C.ink}"
+      >${xml(city.length > 30 ? city.slice(0, 29) + "…" : city)}</text>
+
+      <text
+        x="174"
+        y="884"
+        font-family="Arial,sans-serif"
+        font-size="22"
+        fill="${C.ink}"
+      >Join a trusted healthcare network</text>
+
+      ${salaryBlock}
+
+      <rect
+        x="48"
+        y="${ctaY}"
+        width="984"
+        height="94"
+        rx="24"
+        fill="${C.green}"
+      />
+
+      <text
+        x="540"
+        y="${ctaTextY}"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="30"
+        font-weight="800"
+        fill="#FFFFFF"
+      >INTERESTED? LET'S CONNECT</text>
+
+      <text
+        x="540"
+        y="${ctaSubY}"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="22"
+        fill="#FFFFFF"
+      >Share this opportunity or refer a colleague</text>
+
+      <path
+        d="M0 1190 Q260 1150 540 1190 T1080 1180 L1080 1350 L0 1350Z"
+        fill="${C.navy}"
+      />
+
+      <rect
+        x="48"
+        y="1210"
+        width="984"
+        height="105"
+        rx="22"
+        fill="#FFFFFF"
+      />
+
+      <text
+        x="540"
+        y="1243"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="20"
+        font-weight="800"
+        fill="${C.green}"
+      >CONTACT MEDPACT</text>
+
+      <text
+        x="540"
+        y="1280"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="27"
+        font-weight="800"
+        fill="${C.navy}"
+      >${PHONE}</text>
+
+      <text
+        x="540"
+        y="1307"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="20"
+        fill="${C.ink}"
+      >${EMAIL}  |  ${WEBSITE}</text>
     </svg>
   `
 }
@@ -218,8 +552,8 @@ export default function PosterPage() {
   const router = useRouter()
 
   const [requirements, setRequirements] = useState([])
-  const [selectedIds, setSelectedIds] = useState([])
-  const [posterType, setPosterType] = useState("single")
+  const [selectedId, setSelectedId] = useState("")
+  const [templateOverride, setTemplateOverride] = useState("auto")
   const [includeSalary, setIncludeSalary] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -234,675 +568,779 @@ export default function PosterPage() {
     setError("")
 
     try {
-      const [
-        requirementsResult,
-        specialtiesResult,
-        hospitalsResult
-      ] = await Promise.all([
-        supabase.from("requirements").select("*").order("entry_date", { ascending: false }),
+      const [reqResult, specResult] = await Promise.all([
+        supabase
+          .from("requirements")
+          .select("*")
+          .order("entry_date", { ascending: false }),
+
         supabase.from("specialties").select("id,name"),
-        supabase.from("hospitals").select("id,hospital_name")
       ])
 
-      if (requirementsResult.error) throw requirementsResult.error
-      if (specialtiesResult.error) throw specialtiesResult.error
-      if (hospitalsResult.error) throw hospitalsResult.error
+      if (reqResult.error) throw reqResult.error
+      if (specResult.error) throw specResult.error
 
       const specialtyMap = Object.fromEntries(
-        (specialtiesResult.data || []).map(item => [String(item.id), item.name])
+        (specResult.data || []).map((s) => [
+          String(s.id),
+          s.name,
+        ])
       )
 
-      const hospitalMap = Object.fromEntries(
-        (hospitalsResult.data || []).map(item => [String(item.id), item.hospital_name])
+      setRequirements(
+        (reqResult.data || [])
+          .filter((r) => !r.status || r.status === "open")
+          .map((r) => ({
+            ...r,
+            specialty_name:
+              specialtyMap[String(r.specialty_id)] || "Doctor",
+          }))
       )
-
-      const mapped = (requirementsResult.data || [])
-        .filter(r => !r.status || r.status === "open")
-        .map(r => ({
-          ...r,
-          specialty_name: specialtyMap[String(r.specialty_id)] || "Doctor",
-          hospital_name: hospitalMap[String(r.hospital_id)] || "",
-          city: r.city || ""
-        }))
-
-      setRequirements(mapped)
-    } catch (err) {
-      console.error("Poster requirements load error:", err)
-      setError(err.message || "Could not load requirements.")
+    } catch (e) {
+      console.error("Poster requirements load error:", e)
+      setError(e.message || "Could not load requirements.")
     } finally {
       setLoading(false)
     }
   }
 
-  const selectedRequirements = useMemo(
-    () => requirements.filter(r => selectedIds.includes(String(r.id))),
-    [requirements, selectedIds]
+  const selectedRequirement = useMemo(
+    () =>
+      requirements.find(
+        (r) => String(r.id) === String(selectedId)
+      ) || null,
+    [requirements, selectedId]
   )
 
-  const effectiveRequirements = posterType === "single"
-    ? selectedRequirements.slice(0, 1)
-    : selectedRequirements.slice(0, 6)
+  const suggestedTemplate = selectedRequirement
+    ? chooseTemplate(selectedRequirement.specialty_name)
+    : TEMPLATES[5]
 
-  const svg = useMemo(() => {
-    if (!effectiveRequirements.length) return ""
-    return makePosterSvg(posterType, effectiveRequirements, includeSalary)
-  }, [posterType, effectiveRequirements, includeSalary])
+  const activeTemplate =
+    templateOverride === "auto"
+      ? suggestedTemplate
+      : TEMPLATES.find((t) => t.id === templateOverride) ||
+        suggestedTemplate
 
-  const previewUrl = useMemo(() => {
-    if (!svg) return ""
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-  }, [svg])
+  const svg = useMemo(
+    () =>
+      selectedRequirement
+        ? makePosterSvg(
+            selectedRequirement,
+            activeTemplate,
+            includeSalary
+          )
+        : "",
+    [selectedRequirement, activeTemplate, includeSalary]
+  )
 
-  function toggleRequirement(id) {
-    const key = String(id)
-
-    setSelectedIds(previous => {
-      if (previous.includes(key)) {
-        return previous.filter(item => item !== key)
-      }
-
-      if (posterType === "single") {
-        return [key]
-      }
-
-      if (previous.length >= 6) {
-        setNotice("A multiple-requirement poster supports up to 6 vacancies.")
-        return previous
-      }
-
-      return [...previous, key]
-    })
-
-    setNotice("")
-  }
-
-  function changePosterType(type) {
-    setPosterType(type)
-    setSelectedIds(previous => type === "single" ? previous.slice(0, 1) : previous.slice(0, 6))
-    setNotice("")
-  }
+  const previewUrl = useMemo(
+    () =>
+      svg
+        ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+        : "",
+    [svg]
+  )
 
   async function downloadPng() {
-    if (!svg) {
-      setNotice("Select at least one requirement first.")
+    if (!selectedRequirement || !svg) {
+      setNotice("Select a requirement first.")
       return
     }
 
     setNotice("Preparing your PNG poster...")
 
-    try {
-      const logoResponse = await fetch(LOGO_URL)
+    let objectUrl = ""
 
-      if (!logoResponse.ok) {
-        throw new Error(`Could not load the Medpact recruitment logo at ${LOGO_URL}`)
+    try {
+      const response = await fetch(LOGO_URL)
+
+      if (!response.ok) {
+        throw new Error(
+          `Medpact logo not found. Add your logo at public${LOGO_URL}.`
+        )
       }
 
-      const logoBlob = await logoResponse.blob()
-      const logoDataUrl = await new Promise((resolve, reject) => {
+      const logoBlob = await response.blob()
+
+      const logoData = await new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => resolve(reader.result)
         reader.onerror = reject
         reader.readAsDataURL(logoBlob)
       })
 
-      const exportSvg = svg.replaceAll(LOGO_URL, logoDataUrl)
-      const svgBlob = new Blob([exportSvg], { type: "image/svg+xml;charset=utf-8" })
-      const objectUrl = URL.createObjectURL(svgBlob)
+      const exportSvg = svg.replaceAll(LOGO_URL, logoData)
 
-      try {
-        const image = new Image()
+      const svgBlob = new Blob([exportSvg], {
+        type: "image/svg+xml;charset=utf-8",
+      })
 
-        await new Promise((resolve, reject) => {
-          image.onload = resolve
-          image.onerror = () => reject(new Error("Could not render poster image."))
-          image.src = objectUrl
-        })
+      objectUrl = URL.createObjectURL(svgBlob)
 
-        const canvas = document.createElement("canvas")
-        canvas.width = 1080
-        canvas.height = 1350
+      const image = new Image()
 
-        const context = canvas.getContext("2d")
+      await new Promise((resolve, reject) => {
+        image.onload = resolve
+        image.onerror = () =>
+          reject(
+            new Error(
+              "Could not render the poster. Check the image URLs and try again."
+            )
+          )
+        image.src = objectUrl
+      })
 
-        if (!context) throw new Error("PNG canvas is not available.")
+      const canvas = document.createElement("canvas")
+      canvas.width = 1080
+      canvas.height = 1350
 
-        context.fillStyle = "#ffffff"
-        context.fillRect(0, 0, canvas.width, canvas.height)
-        context.drawImage(image, 0, 0, canvas.width, canvas.height)
+      const ctx = canvas.getContext("2d")
 
-        const pngBlob = await new Promise((resolve, reject) => {
-          canvas.toBlob(blob => {
-            if (blob) resolve(blob)
-            else reject(new Error("PNG conversion failed."))
-          }, "image/png")
-        })
-
-        const pngUrl = URL.createObjectURL(pngBlob)
-        const link = document.createElement("a")
-        link.href = pngUrl
-        link.download = `medpact-${posterType}-recruitment-poster.png`
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        URL.revokeObjectURL(pngUrl)
-      } finally {
-        URL.revokeObjectURL(objectUrl)
+      if (!ctx) {
+        throw new Error("PNG canvas is not available.")
       }
 
+      ctx.fillStyle = "#FFFFFF"
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+      const pngBlob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) =>
+            blob
+              ? resolve(blob)
+              : reject(new Error("PNG conversion failed.")),
+          "image/png"
+        )
+      })
+
+      const pngUrl = URL.createObjectURL(pngBlob)
+      const link = document.createElement("a")
+
+      link.href = pngUrl
+      link.download = `medpact-${String(
+        selectedRequirement.specialty_name
+      )
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")}-poster.png`
+
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(pngUrl)
+
       setNotice("Poster downloaded successfully.")
-    } catch (err) {
-      console.error("Poster download error:", err)
-      setNotice(err.message || "Could not download poster.")
+    } catch (e) {
+      console.error("Poster download error:", e)
+      setNotice(e.message || "Could not download poster.")
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }
 
-  async function shareWhatsApp() {
-    if (!svg) {
-      setNotice("Select at least one requirement first.")
+  function shareWhatsApp() {
+    if (!selectedRequirement) {
+      setNotice("Select a requirement first.")
       return
     }
 
-    const text = effectiveRequirements.map(r => {
-      const salary = includeSalary && salaryText(r) ? `\nSalary: ${salaryText(r)}` : ""
+    const salary =
+      includeSalary && salaryText(selectedRequirement)
+        ? `\nSalary: ${salaryText(selectedRequirement)}`
+        : ""
 
-      return `🩺 ${r.specialty_name} Vacancy | ${r.city || "Location to be confirmed"}\n` +
-        `🎓 Qualification: ${r.qualification || "As per specialty"}\n` +
-        `Experience: ${experienceText(r.experience_required)}${salary}`
-    }).join("\n\n")
-
-    const message = `${text}\n\n📲 ${PHONE}\n📩 ${EMAIL}\n🌐 ${WEBSITE}\n\nTeam MEDPACT 💙`
-
-    try {
-      await navigator.clipboard.writeText(message)
-      setNotice("Vacancy text copied. Download the poster, then attach it in your WhatsApp Community announcement group.")
-    } catch {
-      setNotice("Download the poster and copy the contact details before sharing it to WhatsApp.")
-    }
+    const message =
+      `🩺 ${selectedRequirement.specialty_name} Vacancy\n` +
+      `📍 Location: ${selectedRequirement.city || "To be confirmed"}\n` +
+      `Experience: ${experienceText(selectedRequirement.experience_required)}` +
+      `${salary}\n\n` +
+      `📲 ${PHONE}\n📩 ${EMAIL}\n🌐 ${WEBSITE}\n\n` +
+      `Team MEDPACT`
 
     window.open(
       `https://wa.me/?text=${encodeURIComponent(message)}`,
       "_blank",
       "noopener,noreferrer"
     )
+
+    setNotice(
+      "WhatsApp opened with vacancy details. Download the PNG and attach it to your message."
+    )
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
+    <main style={S.page}>
+      <header style={S.header}>
         <div>
-          <p style={styles.eyebrow}>MEDPACT RECRUITMENT</p>
-          <h1 style={styles.title}>Recruitment Poster Studio</h1>
-          <p style={styles.subtitle}>
-            Create branded vacancy posters directly from your saved requirements.
+          <p style={S.eyebrow}>MEDPACT RECRUITMENT</p>
+
+          <h1 style={S.title}>
+            Single Requirement Poster Studio
+          </h1>
+
+          <p style={S.subtitle}>
+            Select an open requirement and create a branded,
+            share-ready vacancy poster.
           </p>
         </div>
 
-        <button style={styles.backButton} onClick={() => router.push("/")}>
+        <button
+          style={S.backButton}
+          onClick={() => router.push("/")}
+        >
           ← Dashboard
         </button>
       </header>
 
-      <section style={styles.typeGrid}>
-        <button
-          type="button"
-          onClick={() => changePosterType("single")}
-          style={{
-            ...styles.typeCard,
-            ...(posterType === "single" ? styles.typeSelected : {})
-          }}
-        >
-          <span style={styles.typeIcon}>01</span>
-          <span style={styles.typeTitle}>Single Requirement</span>
-          <span style={styles.typeDescription}>
-            One specialty, one location, one focused poster.
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => changePosterType("multiple")}
-          style={{
-            ...styles.typeCard,
-            ...(posterType === "multiple" ? styles.typeSelected : {})
-          }}
-        >
-          <span style={styles.typeIcon}>06</span>
-          <span style={styles.typeTitle}>Multiple Requirements</span>
-          <span style={styles.typeDescription}>
-            Combine up to six vacancies across different locations.
-          </span>
-        </button>
-      </section>
-
-      <section style={styles.workspace}>
-        <div style={styles.selectorPanel}>
-          <div style={styles.panelHeading}>
+      <section style={S.layout}>
+        <aside style={S.panel}>
+          <div style={S.panelHeading}>
             <div>
-              <h2 style={styles.panelTitle}>Select vacancies</h2>
-              <p style={styles.panelSubtitle}>
-                {posterType === "single"
-                  ? "Select one open requirement."
-                  : "Select up to six open requirements."}
+              <h2 style={S.panelTitle}>
+                1. Select requirement
+              </h2>
+
+              <p style={S.muted}>
+                Only open requirements are listed.
               </p>
             </div>
 
-            <button style={styles.refreshButton} onClick={loadRequirements}>
+            <button
+              style={S.smallButton}
+              onClick={loadRequirements}
+            >
               Refresh
             </button>
           </div>
 
-          <label style={styles.salaryToggle}>
-            <input
-              type="checkbox"
-              checked={includeSalary}
-              onChange={e => setIncludeSalary(e.target.checked)}
-            />
-            Include salary when available
-          </label>
+          <label style={S.label}>Vacancy</label>
 
-          {loading && <p style={styles.message}>Loading requirements...</p>}
+          {loading && (
+            <p style={S.muted}>Loading requirements...</p>
+          )}
 
           {!loading && error && (
-            <div style={styles.error}>
+            <div style={S.error}>
               {error}
-              <button style={styles.refreshButton} onClick={loadRequirements}>
-                Try again
-              </button>
+              <p>
+                <button
+                  style={S.smallButton}
+                  onClick={loadRequirements}
+                >
+                  Try again
+                </button>
+              </p>
             </div>
           )}
 
           {!loading && !error && requirements.length === 0 && (
-            <div style={styles.empty}>
-              <h3>No open requirements found</h3>
-              <p>Add a requirement first, then return here to create its poster.</p>
-              <button
-                style={styles.primaryButton}
-                onClick={() => router.push("/requirements/add")}
-              >
-                + Add Requirement
-              </button>
+            <div style={S.empty}>
+              No open requirements found. Add a requirement first.
+              <p>
+                <button
+                  style={S.primary}
+                  onClick={() => router.push("/requirements/add")}
+                >
+                  + Add requirement
+                </button>
+              </p>
             </div>
           )}
 
-          {!loading && requirements.map(r => {
-            const checked = selectedIds.includes(String(r.id))
-
-            return (
+          <div style={S.list}>
+            {requirements.map((r) => (
               <button
-                type="button"
                 key={r.id}
-                onClick={() => toggleRequirement(r.id)}
+                onClick={() => {
+                  setSelectedId(String(r.id))
+                  setNotice("")
+                }}
                 style={{
-                  ...styles.requirementCard,
-                  ...(checked ? styles.requirementSelected : {})
+                  ...S.reqCard,
+                  ...(String(selectedId) === String(r.id)
+                    ? S.reqSelected
+                    : {}),
                 }}
               >
-                <span style={{
-                  ...styles.checkCircle,
-                  background: checked ? GREEN : "#ffffff",
-                  color: checked ? "#ffffff" : "#64748b"
-                }}>
-                  {checked ? "✓" : "+"}
+                <span
+                  style={{
+                    ...S.radioDot,
+                    background:
+                      String(selectedId) === String(r.id)
+                        ? C.green
+                        : "#fff",
+                  }}
+                >
+                  {String(selectedId) === String(r.id) ? "✓" : ""}
                 </span>
 
-                <span style={styles.requirementContent}>
-                  <strong style={styles.requirementName}>
+                <span style={{ minWidth: 0 }}>
+                  <strong style={S.reqTitle}>
                     {r.specialty_name}
                   </strong>
-                  <span style={styles.requirementLocation}>
+
+                  <span style={S.reqSub}>
                     📍 {r.city || "Location not specified"}
                   </span>
-                  <span style={styles.requirementMeta}>
-                    {displayValue(r.experience_required, "Experience not specified")} years
-                    {" · "}
-                    {displayValue(r.positions, "Positions not specified")} position(s)
+
+                  <span style={S.reqMeta}>
+                    {experienceText(r.experience_required)} ·{" "}
+                    {r.positions || 1} position(s)
                   </span>
                 </span>
               </button>
-            )
-          })}
+            ))}
+          </div>
 
-          {notice && <p style={styles.notice}>{notice}</p>}
-        </div>
+          <div style={S.section}>
+            <h2 style={S.panelTitle}>
+              2. Choose visual style
+            </h2>
 
-        <div style={styles.previewPanel}>
-          <div style={styles.panelHeading}>
+            <p style={S.muted}>
+              Automatic selects a design based on the specialty.
+              You can override it below.
+            </p>
+
+            <label style={S.label}>Template</label>
+
+            <select
+              value={templateOverride}
+              onChange={(e) =>
+                setTemplateOverride(e.target.value)
+              }
+              style={S.select}
+            >
+              <option value="auto">
+                Automatic — recommended for specialty
+              </option>
+
+              {TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+
+            {selectedRequirement && (
+              <div style={S.templateHint}>
+                <strong>
+                  Suggested: {suggestedTemplate.name}
+                </strong>
+
+                <span>{suggestedTemplate.description}</span>
+
+                {templateOverride !== "auto" && (
+                  <span>
+                    Manual override active: {activeTemplate.name}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <label style={S.salaryToggle}>
+              <input
+                type="checkbox"
+                checked={includeSalary}
+                onChange={(e) =>
+                  setIncludeSalary(e.target.checked)
+                }
+              />
+              Include salary on poster (off by default)
+            </label>
+          </div>
+
+          {notice && <p style={S.notice}>{notice}</p>}
+        </aside>
+
+        <section style={S.panel}>
+          <div style={S.panelHeading}>
             <div>
-              <h2 style={styles.panelTitle}>Poster preview</h2>
-              <p style={styles.panelSubtitle}>
-                {effectiveRequirements.length
-                  ? `${effectiveRequirements.length} requirement(s) selected`
-                  : "Select a requirement to preview your poster."}
+              <h2 style={S.panelTitle}>
+                3. Poster preview
+              </h2>
+
+              <p style={S.muted}>
+                {selectedRequirement
+                  ? `${activeTemplate.name} · 1080 × 1350 px`
+                  : "Select a requirement to preview."}
               </p>
             </div>
-            <span style={styles.previewBadge}>1080 × 1350</span>
+
+            <span style={S.badge}>PNG</span>
           </div>
 
           {previewUrl ? (
-            <div style={styles.posterFrame}>
+            <div style={S.posterFrame}>
               <img
                 src={previewUrl}
-                alt="Medpact recruitment poster preview"
-                style={styles.posterImage}
+                alt="Medpact poster preview"
+                style={S.posterImage}
               />
             </div>
           ) : (
-            <div style={styles.previewEmpty}>
-              <span style={{ fontSize: 48 }}>✦</span>
+            <div style={S.previewEmpty}>
+              <span style={{ fontSize: 42 }}>✦</span>
               <h3>Your poster will appear here</h3>
-              <p>Choose a vacancy from the list to get started.</p>
+              <p>Choose an open requirement to begin.</p>
             </div>
           )}
 
-          <div style={styles.actions}>
+          <div style={S.actions}>
             <button
-              style={styles.primaryButton}
+              style={{
+                ...S.primary,
+                ...(!selectedRequirement ? S.disabled : {}),
+              }}
+              disabled={!selectedRequirement}
               onClick={downloadPng}
-              disabled={!effectiveRequirements.length}
             >
               ↓ Download PNG
             </button>
 
             <button
-              style={styles.whatsappButton}
+              style={{
+                ...S.whatsapp,
+                ...(!selectedRequirement ? S.disabled : {}),
+              }}
+              disabled={!selectedRequirement}
               onClick={shareWhatsApp}
-              disabled={!effectiveRequirements.length}
             >
-              Share to WhatsApp
+              Share vacancy on WhatsApp
             </button>
           </div>
 
-          <p style={styles.helpText}>
-            WhatsApp sharing opens a message draft. Attach the downloaded PNG
-            manually in your Community announcement group.
+          <p style={S.help}>
+            WhatsApp opens a message draft. Attach the downloaded
+            poster image manually, especially when posting to a
+            Community announcement group.
           </p>
-        </div>
+
+          <p style={S.privacy}>
+            Poster excludes hospital name and qualification.
+            Salary is hidden unless you enable it.
+          </p>
+        </section>
       </section>
     </main>
   )
 }
 
-const styles = {
+const S = {
   page: {
     minHeight: "100vh",
-    background: "#f3f7fb",
-    padding: "28px",
-    color: INK,
-    fontFamily: "Arial, sans-serif"
+    background: "#F3F7FB",
+    padding: "clamp(14px, 3vw, 30px)",
+    color: C.ink,
+    fontFamily: "Arial, sans-serif",
+    boxSizing: "border-box",
   },
+
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: 20,
-    marginBottom: 28
+    gap: 18,
+    marginBottom: 24,
   },
+
   eyebrow: {
-    margin: "0 0 8px",
-    color: GREEN,
+    margin: "0 0 7px",
+    color: C.green,
     fontSize: 12,
     fontWeight: 800,
-    letterSpacing: 2
+    letterSpacing: 2,
   },
+
   title: {
     margin: 0,
-    color: NAVY,
-    fontSize: "clamp(25px, 4vw, 36px)",
-    letterSpacing: "-1px"
+    color: C.navy,
+    fontSize: "clamp(24px, 3.5vw, 36px)",
+    letterSpacing: "-.7px",
   },
+
   subtitle: {
-    color: "#64748b",
-    margin: "9px 0 0",
-    lineHeight: 1.6
+    color: "#64748B",
+    margin: "8px 0 0",
+    lineHeight: 1.6,
   },
+
   backButton: {
     padding: "11px 16px",
-    background: "#ffffff",
-    border: "1px solid #dbe5ee",
+    background: "#fff",
+    border: "1px solid #D9E4ED",
     borderRadius: 9,
-    color: NAVY,
+    color: C.navy,
     fontWeight: 700,
-    cursor: "pointer"
+    cursor: "pointer",
   },
-  typeGrid: {
+
+  layout: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-    gap: 16,
-    marginBottom: 22
-  },
-  typeCard: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 9,
-    padding: 20,
-    textAlign: "left",
-    border: "1px solid #dbe5ee",
-    borderRadius: 14,
-    background: "#ffffff",
-    cursor: "pointer"
-  },
-  typeSelected: {
-    border: `2px solid ${GREEN}`,
-    background: "#f7fff5",
-    boxShadow: "0 5px 18px rgba(15, 70, 50, 0.08)"
-  },
-  typeIcon: {
-    display: "grid",
-    placeItems: "center",
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    background: PALE,
-    color: BLUE,
-    fontWeight: 900
-  },
-  typeTitle: {
-    fontWeight: 800,
-    color: NAVY,
-    fontSize: 17
-  },
-  typeDescription: {
-    color: "#64748b",
-    fontSize: 13,
-    lineHeight: 1.5
-  },
-  workspace: {
-    display: "grid",
-    gridTemplateColumns: "minmax(280px, 0.85fr) minmax(320px, 1.15fr)",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
     alignItems: "start",
-    gap: 22
+    gap: 20,
   },
-  selectorPanel: {
+
+  panel: {
     minWidth: 0,
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: 20
+    background: "#fff",
+    border: "1px solid #E2E8F0",
+    borderRadius: 16,
+    padding: "clamp(14px, 2vw, 22px)",
+    boxShadow: "0 5px 20px rgba(15, 50, 80, .035)",
   },
-  previewPanel: {
-    minWidth: 0,
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: 20
-  },
+
   panelHeading: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12,
-    marginBottom: 18
+    marginBottom: 16,
   },
+
   panelTitle: {
     margin: 0,
-    fontSize: 19,
-    color: NAVY
+    fontSize: 18,
+    color: C.navy,
   },
-  panelSubtitle: {
-    color: "#64748b",
+
+  muted: {
+    color: "#64748B",
     fontSize: 13,
-    margin: "6px 0 0",
-    lineHeight: 1.5
+    lineHeight: 1.5,
+    margin: "6px 0 12px",
   },
-  refreshButton: {
-    background: "#ffffff",
-    color: NAVY,
-    border: "1px solid #dbe5ee",
-    borderRadius: 7,
+
+  smallButton: {
+    background: "#fff",
+    color: C.navy,
+    border: "1px solid #D9E4ED",
+    borderRadius: 8,
     padding: "8px 11px",
     cursor: "pointer",
-    fontWeight: 700
+    fontWeight: 700,
   },
+
+  label: {
+    display: "block",
+    color: C.navy,
+    fontWeight: 700,
+    fontSize: 13,
+    margin: "14px 0 8px",
+  },
+
+  list: {
+    display: "grid",
+    gap: 8,
+    maxHeight: 390,
+    overflowY: "auto",
+  },
+
+  reqCard: {
+    width: "100%",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 11,
+    textAlign: "left",
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid #E2E8F0",
+    background: "#fff",
+    cursor: "pointer",
+  },
+
+  reqSelected: {
+    border: `2px solid ${C.green}`,
+    background: "#F5FFF2",
+  },
+
+  radioDot: {
+    display: "grid",
+    placeItems: "center",
+    width: 24,
+    height: 24,
+    flexShrink: 0,
+    borderRadius: "50%",
+    border: "1px solid #CBD5E1",
+    color: "#fff",
+    fontWeight: 900,
+    fontSize: 13,
+  },
+
+  reqTitle: {
+    display: "block",
+    color: C.navy,
+    fontSize: 14,
+    marginBottom: 5,
+  },
+
+  reqSub: {
+    display: "block",
+    color: C.green,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+
+  reqMeta: {
+    display: "block",
+    color: "#64748B",
+    fontSize: 11,
+  },
+
+  section: {
+    borderTop: "1px solid #E7EEF4",
+    marginTop: 20,
+    paddingTop: 20,
+  },
+
+  select: {
+    width: "100%",
+    padding: 12,
+    borderRadius: 9,
+    border: "1px solid #D6E2EC",
+    color: C.navy,
+    background: "#fff",
+    fontSize: 14,
+  },
+
+  templateHint: {
+    display: "grid",
+    gap: 6,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    background: C.pale,
+    color: C.ink,
+    fontSize: 12,
+    lineHeight: 1.5,
+  },
+
   salaryToggle: {
     display: "flex",
     alignItems: "center",
     gap: 9,
-    padding: "12px",
-    marginBottom: 14,
+    padding: 12,
+    marginTop: 14,
     borderRadius: 8,
-    background: "#f8fafc",
+    background: "#F8FAFC",
     fontSize: 13,
-    color: INK
+    color: C.ink,
   },
-  requirementCard: {
-    width: "100%",
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 12,
-    textAlign: "left",
-    padding: 14,
-    marginBottom: 10,
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: "#ffffff",
-    cursor: "pointer"
-  },
-  requirementSelected: {
-    border: `2px solid ${GREEN}`,
-    background: "#f5fff2"
-  },
-  checkCircle: {
-    display: "grid",
-    placeItems: "center",
-    width: 26,
-    height: 26,
-    flexShrink: 0,
-    borderRadius: "50%",
-    border: "1px solid #cbd5e1",
-    fontWeight: 900
-  },
-  requirementContent: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-    minWidth: 0
-  },
-  requirementName: {
-    color: NAVY,
-    fontSize: 15
-  },
-  requirementLocation: {
-    color: GREEN,
-    fontSize: 13
-  },
-  requirementMeta: {
-    color: "#64748b",
-    fontSize: 12
-  },
+
   posterFrame: {
     width: "100%",
     maxWidth: 540,
     margin: "0 auto",
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: "hidden",
-    border: "1px solid #dbe5ee",
-    background: "#ffffff"
+    border: "1px solid #D9E4ED",
+    background: "#fff",
   },
+
   posterImage: {
     display: "block",
     width: "100%",
-    height: "auto"
+    height: "auto",
   },
-  previewBadge: {
-    whiteSpace: "nowrap",
-    background: PALE,
-    color: BLUE,
+
+  badge: {
+    background: C.pale,
+    color: C.blue,
     padding: "7px 9px",
     borderRadius: 7,
     fontSize: 11,
-    fontWeight: 800
+    fontWeight: 800,
   },
+
   previewEmpty: {
-    minHeight: 340,
+    minHeight: 320,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    background: "#f8fafc",
-    border: "2px dashed #cbd5e1",
+    background: "#F8FAFC",
+    border: "2px dashed #CBD5E1",
     borderRadius: 12,
-    color: "#64748b",
+    color: "#64748B",
     textAlign: "center",
-    padding: 20
+    padding: 20,
   },
+
   actions: {
     display: "flex",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 18
+    marginTop: 16,
   },
-  primaryButton: {
+
+  primary: {
     flex: "1 1 160px",
     padding: "12px 15px",
-    background: NAVY,
-    color: "#ffffff",
+    background: C.navy,
+    color: "#fff",
     border: "none",
-    borderRadius: 8,
+    borderRadius: 9,
     fontWeight: 800,
-    cursor: "pointer"
+    cursor: "pointer",
   },
-  whatsappButton: {
+
+  whatsapp: {
     flex: "1 1 160px",
     padding: "12px 15px",
-    background: GREEN,
-    color: "#ffffff",
+    background: C.green,
+    color: "#fff",
     border: "none",
-    borderRadius: 8,
+    borderRadius: 9,
     fontWeight: 800,
-    cursor: "pointer"
+    cursor: "pointer",
   },
-  helpText: {
-    color: "#64748b",
+
+  disabled: {
+    opacity: 0.45,
+    cursor: "not-allowed",
+  },
+
+  help: {
+    color: "#64748B",
     fontSize: 12,
     lineHeight: 1.6,
-    marginBottom: 0
+    marginBottom: 0,
   },
-  message: {
-    color: "#64748b",
-    padding: 15
+
+  privacy: {
+    color: C.blue,
+    fontSize: 12,
+    lineHeight: 1.5,
+    marginBottom: 0,
   },
+
   notice: {
-    color: BLUE,
+    color: C.blue,
     fontSize: 13,
     lineHeight: 1.5,
     padding: 12,
-    background: PALE,
-    borderRadius: 8
+    background: C.pale,
+    borderRadius: 8,
   },
+
   error: {
     padding: 14,
-    background: "#fff1f2",
-    color: "#be123c",
+    background: "#FFF1F2",
+    color: "#BE123C",
     borderRadius: 8,
-    lineHeight: 1.6
+    lineHeight: 1.6,
   },
+
   empty: {
-    padding: 20,
-    background: "#f8fafc",
+    padding: 18,
+    background: "#F8FAFC",
     borderRadius: 10,
     textAlign: "center",
-    lineHeight: 1.6
-  }
+    lineHeight: 1.6,
+    color: C.ink,
+  },
 }
