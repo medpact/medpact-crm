@@ -230,64 +230,6 @@ export default function MonthlyIncentivesPage() {
         </select>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-          gap: "16px",
-          marginBottom: "28px",
-        }}
-      >
-        {[
-          {
-            label: "Total Placements",
-            value: visibleCount,
-            color: "#1d4ed8",
-          },
-          {
-            label: "Commissionable Placement Fees",
-            value: money(visibleTotalFees),
-            color: "#047857",
-          },
-          {
-            label: "Estimated Team Incentive",
-            value: money(visibleIncentive),
-            color: "#7c3aed",
-          },
-        ].map((card) => (
-          <div
-            key={card.label}
-            style={{
-              background: "#fff",
-              padding: "22px",
-              borderRadius: "12px",
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
-            }}
-          >
-            <div
-              style={{
-                color: "#64748b",
-                fontSize: "14px",
-                marginBottom: "10px",
-              }}
-            >
-              {card.label}
-            </div>
-
-            <div
-              style={{
-                fontSize: "25px",
-                fontWeight: 700,
-                color: card.color,
-                overflowWrap: "anywhere",
-              }}
-            >
-              {card.value}
-            </div>
-          </div>
-        ))}
-      </div>
 
       <section
         style={{
