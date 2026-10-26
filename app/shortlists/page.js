@@ -15,20 +15,21 @@ export default function ShortlistsPage() {
     fetchShortlists()
   }, [])
 
-  /* DATE FORMAT */
-
   function formatDate(date) {
     if (!date) return ""
 
     const d = new Date(date)
-
     if (Number.isNaN(d.getTime())) return ""
 
-    const day = String(d.getDate()).padStart(2, "0")
-    const month = String(d.getMonth() + 1).padStart(2, "0")
-    const year = d.getFullYear()
+    return `${String(d.getDate()).padStart(2, "0")}/${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}/${d.getFullYear()}`
+  }
 
-    return `${day}/${month}/${year}`
+  function formatCurrency(amount) {
+    return Number(amount).toLocaleString("en-IN", {
+      maximumFractionDigits: 2
+    })
   }
 
   /* FETCH PIPELINE */
@@ -76,37 +77,57 @@ export default function ShortlistsPage() {
     setLoading(false)
   }
 
-  /* CHANGE PIPELINE STATUS */
+  /* STATUS CHANGE */
 
   async function changeStatus(row, newStatus, message) {
     if (processingId !== null) return
 
-    /* PLACEMENT FLOW */
+    /* PLACEMENT CONFIRMATION */
 
     if (newStatus === "placement_done") {
       const salaryInput = prompt(
-        "Enter the doctor's agreed annual salary in INR (numbers only):"
+        "Enter the agreed annual CTC in INR (numbers only):"
       )
 
-      if (
-        salaryInput === null ||
-        salaryInput.trim() === ""
-      ) {
-        alert("Salary is mandatory. Placement was not completed.")
+      if (salaryInput === null || !salaryInput.trim()) {
+        alert("Annual CTC is mandatory.")
         return
       }
 
       const salaryText = salaryInput.trim()
 
       if (!/^\d+(\.\d{1,2})?$/.test(salaryText)) {
-        alert("Enter a valid salary using numbers only.")
+        alert("Enter a valid annual CTC using numbers only.")
         return
       }
 
-      const salary = Number(salaryText)
+      const ctc = Number(salaryText)
 
-      if (!Number.isFinite(salary) || salary <= 0) {
-        alert("Salary must be greater than zero.")
+      if (!Number.isFinite(ctc) || ctc <= 0) {
+        alert("Annual CTC must be greater than zero.")
+        return
+      }
+
+      const feeInput = prompt(
+        "Enter the fixed Medpact placement fee in INR (numbers only):"
+      )
+
+      if (feeInput === null || !feeInput.trim()) {
+        alert("Placement fee is mandatory.")
+        return
+      }
+
+      const feeText = feeInput.trim()
+
+      if (!/^\d+(\.\d{1,2})?$/.test(feeText)) {
+        alert("Enter a valid placement fee using numbers only.")
+        return
+      }
+
+      const placementFee = Number(feeText)
+
+      if (!Number.isFinite(placementFee) || placementFee <= 0) {
+        alert("Placement fee must be greater than zero.")
         return
       }
 
@@ -114,22 +135,15 @@ export default function ShortlistsPage() {
         "Enter the doctor's actual joining date (YYYY-MM-DD):"
       )
 
-      if (
-        joiningDateInput === null ||
-        joiningDateInput.trim() === ""
-      ) {
-        alert("Joining date is mandatory. Placement was not completed.")
+      if (joiningDateInput === null || !joiningDateInput.trim()) {
+        alert("Actual joining date is mandatory.")
         return
       }
 
       const joiningDate = joiningDateInput.trim()
 
-      const dateMatch = joiningDate.match(
-        /^(\d{4})-(\d{2})-(\d{2})$/
-      )
-
-      if (!dateMatch) {
-        alert("Enter the joining date in YYYY-MM-DD format.")
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(joiningDate)) {
+        alert("Enter joining date in YYYY-MM-DD format.")
         return
       }
 
@@ -139,20 +153,20 @@ export default function ShortlistsPage() {
         Number.isNaN(parsedDate.getTime()) ||
         parsedDate.toISOString().slice(0, 10) !== joiningDate
       ) {
-        alert("Enter a valid joining date.")
+        alert("Enter a valid calendar date.")
         return
       }
 
+      const doctorName = row.doctors?.name || "Unknown doctor"
       const hospitalName =
-        row.requirements?.hospitals?.hospital_name ||
-        "the selected hospital"
-
-      const doctorName =
-        row.doctors?.name || "this doctor"
+        row.requirements?.hospitals?.hospital_name || "Unknown hospital"
 
       const confirmed = confirm(
-        `Confirm placement for ${doctorName} at ${hospitalName}?\n\n` +
-        `Annual Salary: ₹${salary.toLocaleString("en-IN")}\n` +
+        `Confirm placement?\n\n` +
+        `Doctor: ${doctorName}\n` +
+        `Hospital: ${hospitalName}\n` +
+        `Annual CTC: ₹${formatCurrency(ctc)}\n` +
+        `Placement Fee: ₹${formatCurrency(placementFee)}\n` +
         `Actual Joining Date: ${formatDate(joiningDate)}`
       )
 
@@ -161,84 +175,59 @@ export default function ShortlistsPage() {
       setProcessingId(row.id)
 
       try {
-        /*
-         * STEP 1:
-         * Create placement with mandatory salary and joining date.
-         */
+        /* STEP 1: CREATE PLACEMENT */
 
-        const { data: placementData, error: placementError } =
-          await supabase
-            .from("placements")
-            .insert({
-              doctor_id: row.doctor_id,
-              hospital_id: row.requirements?.hospital_id,
-              ctc: salary,
-              joining_date: joiningDate
-            })
-            .select("id")
-            .single()
+        const { error: placementError } = await supabase
+          .from("placements")
+          .insert({
+            doctor_id: row.doctor_id,
+            hospital_id: row.requirements?.hospital_id,
+            requirement_id: row.requirement_id || null,
+            joining_date: joiningDate,
+            ctc: ctc,
+            placement_fee: placementFee
+          })
 
         if (placementError) {
           console.error("Placement creation error:", placementError)
-
           alert(
-            "Failed to create placement: " +
-            placementError.message
+            "Failed to create placement: " + placementError.message
           )
-
           return
         }
 
-        /*
-         * STEP 2:
-         * Update pipeline status.
-         */
+        /* STEP 2: UPDATE PIPELINE STATUS */
 
         const { error: shortlistError } = await supabase
           .from("shortlists")
-          .update({
-            status: "placement_done"
-          })
+          .update({ status: "placement_done" })
           .eq("id", row.id)
 
         if (shortlistError) {
           console.error("Pipeline update error:", shortlistError)
-
           alert(
-            "The placement record was created, but the pipeline status " +
-            "could not be updated. Please check the Placements page " +
-            "before attempting this again."
+            "Placement was saved, but the pipeline status could not " +
+            "be updated. Check the Placements page before retrying."
           )
-
           await fetchShortlists()
           return
         }
 
-        /*
-         * STEP 3:
-         * Mark doctor unavailable.
-         */
+        /* STEP 3: UPDATE DOCTOR AVAILABILITY */
 
         const { error: doctorError } = await supabase
           .from("doctors")
-          .update({
-            availability_status: "not_available"
-          })
+          .update({ availability_status: "not_available" })
           .eq("id", row.doctor_id)
 
         if (doctorError) {
           console.error("Doctor availability update error:", doctorError)
-
           alert(
-            "Placement saved, but the doctor's availability " +
-            "could not be updated."
+            "Placement saved, but doctor availability could not be updated."
           )
         }
 
-        /*
-         * STEP 4:
-         * Delete the fulfilled requirement.
-         */
+        /* STEP 4: DELETE FULFILLED REQUIREMENT */
 
         if (row.requirement_id) {
           const { error: requirementError } = await supabase
@@ -251,7 +240,6 @@ export default function ShortlistsPage() {
               "Requirement deletion error:",
               requirementError
             )
-
             alert(
               "Placement saved, but the requirement could not be deleted."
             )
@@ -260,18 +248,17 @@ export default function ShortlistsPage() {
 
         alert(
           "Placement recorded successfully.\n\n" +
-          `Doctor: ${doctorName}\n` +
-          `Annual Salary: ₹${salary.toLocaleString("en-IN")}\n` +
+          `Annual CTC: ₹${formatCurrency(ctc)}\n` +
+          `Placement Fee: ₹${formatCurrency(placementFee)}\n` +
           `Joining Date: ${formatDate(joiningDate)}`
         )
 
         await fetchShortlists()
       } catch (error) {
         console.error("Placement processing error:", error)
-
         alert(
           "An unexpected error occurred. Check the Placements page " +
-          "before trying again."
+          "before attempting this placement again."
         )
       } finally {
         setProcessingId(null)
@@ -282,18 +269,14 @@ export default function ShortlistsPage() {
 
     /* OTHER STATUS CHANGES */
 
-    const confirmAction = confirm(message)
-
-    if (!confirmAction) return
+    if (!confirm(message)) return
 
     setProcessingId(row.id)
 
     try {
       const { error } = await supabase
         .from("shortlists")
-        .update({
-          status: newStatus
-        })
+        .update({ status: newStatus })
         .eq("id", row.id)
 
       if (error) {
@@ -311,30 +294,26 @@ export default function ShortlistsPage() {
   /* REJECT CANDIDATE */
 
   async function rejectCandidate(row) {
-    const reason = prompt(
-      "Enter rejection reason (Mandatory):"
-    )
+    if (processingId !== null) return
+
+    const reason = prompt("Enter rejection reason (Mandatory):")
 
     if (!reason || !reason.trim()) {
       alert("Rejection reason is mandatory.")
       return
     }
 
-    if (processingId !== null) return
-
     setProcessingId(row.id)
 
     try {
       const hospitalName =
-        row.requirements?.hospitals?.hospital_name ||
-        "Unknown Hospital"
+        row.requirements?.hospitals?.hospital_name || "Unknown Hospital"
 
-      const { data: doctorData, error: doctorFetchError } =
-        await supabase
-          .from("doctors")
-          .select("remarks")
-          .eq("id", row.doctor_id)
-          .single()
+      const { data: doctorData, error: doctorFetchError } = await supabase
+        .from("doctors")
+        .select("remarks")
+        .eq("id", row.doctor_id)
+        .single()
 
       if (doctorFetchError) {
         console.error("Doctor remarks loading error:", doctorFetchError)
@@ -372,9 +351,7 @@ export default function ShortlistsPage() {
 
       const { error: doctorError } = await supabase
         .from("doctors")
-        .update({
-          remarks: updatedRemarks
-        })
+        .update({ remarks: updatedRemarks })
         .eq("id", row.doctor_id)
 
       if (doctorError) {
@@ -388,7 +365,7 @@ export default function ShortlistsPage() {
     }
   }
 
-  /* PIPELINE AGE */
+  /* AGE OF PIPELINE RECORD */
 
   function getAge(createdDate) {
     if (!createdDate) return 0
@@ -401,7 +378,7 @@ export default function ShortlistsPage() {
     )
   }
 
-  /* STATUS COLOR */
+  /* STATUS COLORS */
 
   function statusColor(status) {
     if (status === "shortlisted") return "#f59e0b"
@@ -411,23 +388,20 @@ export default function ShortlistsPage() {
     if (status === "placement_done") return "#16a34a"
     if (status === "rejected") return "#ef4444"
     if (status === "closed") return "#6b7280"
-
     return "#64748b"
   }
 
   /* CLOSE PIPELINE */
 
   async function closePipeline(row) {
-    const reason = prompt(
-      "Reason for closing this pipeline?"
-    )
+    if (processingId !== null) return
+
+    const reason = prompt("Reason for closing this pipeline?")
 
     if (!reason || !reason.trim()) {
       alert("Close reason is mandatory.")
       return
     }
-
-    if (processingId !== null) return
 
     setProcessingId(row.id)
 
@@ -485,15 +459,7 @@ export default function ShortlistsPage() {
           {getAge(row.created_at) > 45 && (
             <button
               disabled={busy}
-              style={{
-                marginLeft: "6px",
-                background: "#6b7280",
-                color: "#fff",
-                border: "none",
-                padding: "6px 10px",
-                borderRadius: "4px",
-                cursor: "pointer"
-              }}
+              style={closeButtonStyle}
               onClick={() => closePipeline(row)}
             >
               Close
@@ -530,15 +496,7 @@ export default function ShortlistsPage() {
           {getAge(row.created_at) > 45 && (
             <button
               disabled={busy}
-              style={{
-                marginLeft: "6px",
-                background: "#6b7280",
-                color: "#fff",
-                border: "none",
-                padding: "6px 10px",
-                borderRadius: "4px",
-                cursor: "pointer"
-              }}
+              style={closeButtonStyle}
               onClick={() => closePipeline(row)}
             >
               Close
@@ -575,15 +533,7 @@ export default function ShortlistsPage() {
           {getAge(row.created_at) > 45 && (
             <button
               disabled={busy}
-              style={{
-                marginLeft: "6px",
-                background: "#6b7280",
-                color: "#fff",
-                border: "none",
-                padding: "6px 10px",
-                borderRadius: "4px",
-                cursor: "pointer"
-              }}
+              style={closeButtonStyle}
               onClick={() => closePipeline(row)}
             >
               Close
@@ -620,15 +570,7 @@ export default function ShortlistsPage() {
           {getAge(row.created_at) > 45 && (
             <button
               disabled={busy}
-              style={{
-                marginLeft: "6px",
-                background: "#6b7280",
-                color: "#fff",
-                border: "none",
-                padding: "6px 10px",
-                borderRadius: "4px",
-                cursor: "pointer"
-              }}
+              style={closeButtonStyle}
               onClick={() => closePipeline(row)}
             >
               Close
@@ -639,6 +581,16 @@ export default function ShortlistsPage() {
     }
 
     return "-"
+  }
+
+  const closeButtonStyle = {
+    marginLeft: "6px",
+    background: "#6b7280",
+    color: "#fff",
+    border: "none",
+    padding: "6px 10px",
+    borderRadius: "4px",
+    cursor: "pointer"
   }
 
   /* SEARCH */
@@ -696,17 +648,8 @@ export default function ShortlistsPage() {
           overflowX: "auto"
         }}
       >
-        <table
-          width="100%"
-          cellPadding="12"
-          style={{ minWidth: "1050px" }}
-        >
-          <thead
-            style={{
-              background: "#f8fafc",
-              textAlign: "left"
-            }}
-          >
+        <table width="100%" cellPadding="12" style={{ minWidth: "1050px" }}>
+          <thead style={{ background: "#f8fafc", textAlign: "left" }}>
             <tr>
               <th>Date</th>
               <th>Doctor</th>
@@ -723,14 +666,7 @@ export default function ShortlistsPage() {
           <tbody>
             {!loading && filteredShortlists.length === 0 ? (
               <tr>
-                <td
-                  colSpan={9}
-                  style={{
-                    padding: "30px",
-                    textAlign: "center",
-                    color: "#64748b"
-                  }}
-                >
+                <td colSpan={9} style={{ padding: "30px", textAlign: "center" }}>
                   No active candidates found.
                 </td>
               </tr>
@@ -739,14 +675,9 @@ export default function ShortlistsPage() {
                 const age = getAge(s.created_at)
 
                 return (
-                  <tr
-                    key={s.id}
-                    style={{
-                      borderTop: "1px solid #e5e7eb"
-                    }}
-                  >
+                  <tr key={s.id} style={{ borderTop: "1px solid #e5e7eb" }}>
                     <td
-                      title={`${age} days old`}
+                      title={`${age} Days Old`}
                       style={{
                         color:
                           age > 45
@@ -768,32 +699,19 @@ export default function ShortlistsPage() {
                       </Link>
                     </td>
 
-                    <td>
-                      {s.doctors?.specialties?.name || "—"}
-                    </td>
-
-                    <td>
-                      {s.requirements?.hospitals?.hospital_name || "—"}
-                    </td>
-
-                    <td>
-                      {s.requirements?.specialties?.name || "—"}
-                    </td>
-
-                    <td>
-                      {s.requirements?.city || "—"}
-                    </td>
+                    <td>{s.doctors?.specialties?.name || "—"}</td>
+                    <td>{s.requirements?.hospitals?.hospital_name || "—"}</td>
+                    <td>{s.requirements?.specialties?.name || "—"}</td>
+                    <td>{s.requirements?.city || "—"}</td>
 
                     <td>
                       <span
                         style={{
-                          display: "inline-block",
                           padding: "4px 10px",
                           borderRadius: "20px",
                           fontSize: "12px",
                           color: "#fff",
-                          background: statusColor(s.status),
-                          whiteSpace: "nowrap"
+                          background: statusColor(s.status)
                         }}
                       >
                         {s.status}
