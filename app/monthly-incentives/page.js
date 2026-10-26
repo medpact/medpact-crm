@@ -485,7 +485,6 @@ export default function MonthlyIncentivesPage() {
 
         <p style={{ color: "#64748b", fontSize: "13px", marginBottom: 0 }}>
           Incentive is estimated on the entire month's total placement fees.
-          Confirm the incentive slabs before using these figures for payroll.
         </p>
       </section>
     </div>
