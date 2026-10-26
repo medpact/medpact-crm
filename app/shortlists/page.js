@@ -172,7 +172,7 @@ export default function ShortlistsPage() {
             .insert({
               doctor_id: row.doctor_id,
               hospital_id: row.requirements?.hospital_id,
-              salary: salary,
+              ctc: salary,
               joining_date: joiningDate
             })
             .select("id")
