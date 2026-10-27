@@ -40,6 +40,8 @@ const menu=[
 {label:"Placements",href:"/placements",icon:"✅"},
 {label:"Generate Poster",href:"/requirements/poster",icon:"🎨"},
 {label:"Targets",href:"/monthly-incentives",icon:"✅"},
+{label:"Outreach",href:"/dashboard/hospital-outreach",icon:"🏥"},
+  
   
 ]
 
