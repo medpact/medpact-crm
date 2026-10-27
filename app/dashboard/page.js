@@ -71,6 +71,20 @@ function getStateColor(state) {
   return stateColors[hash % stateColors.length]
 }
 
+// Fixed display figures for the Rajesh dashboard.
+// Other users continue to see live Supabase state-wise data.
+const RAJESH_STATE_FIGURES = [
+  { state: "Andhra Pradesh", requirements: 68, placements: 43 },
+  { state: "Telangana", requirements: 57, placements: 23 },
+  { state: "Odisha", requirements: 14, placements: 6 },
+  { state: "Chhattisgarh", requirements: 11, placements: 8 },
+  { state: "Uttar Pradesh", requirements: 11, placements: 3 },
+  { state: "Assam", requirements: 7, placements: 2 },
+  { state: "Delhi", requirements: 20, placements: 9 },
+  { state: "Karnataka", requirements: 18, placements: 11 },
+  { state: "Maharashtra", requirements: 10, placements: 4 }
+]
+
 export default function Dashboard() {
   const router = useRouter()
 
@@ -141,6 +155,13 @@ export default function Dashboard() {
 
     const username =
       userObj.username?.trim().toLowerCase() || ""
+
+    if (!username) {
+      localStorage.removeItem("medpact_user")
+      localStorage.removeItem(SESSION_KEY)
+      router.replace("/login")
+      return
+    }
 
     setCurrentUser(username)
     setMounted(true)
@@ -342,7 +363,13 @@ export default function Dashboard() {
         "Error fetching hospital states:",
         stateError
       )
-      setStateSummary([])
+
+      if (isRajesh) {
+        setStateSummary(RAJESH_STATE_FIGURES)
+      } else {
+        setStateSummary([])
+      }
+
       return
     }
 
@@ -414,64 +441,7 @@ export default function Dashboard() {
     )
 
     if (isRajesh) {
-      const fallbackStates = [
-        "Andhra Pradesh",
-        "Telangana",
-        "Karnataka",
-        "Tamil Nadu",
-        "Maharashtra",
-        "Kerala",
-        "Uttar Pradesh",
-        "Gujarat",
-        "Rajasthan",
-        "Madhya Pradesh",
-        "West Bengal",
-        "Odisha",
-        "Haryana"
-      ]
-
-      const stateNames = actualStateSummary
-        .map((item) => item.state)
-        .filter((name) => name && name !== "Unknown")
-        .slice(0, 13)
-
-      const names =
-        stateNames.length === 13
-          ? stateNames
-          : fallbackStates
-
-      const smallerValues = [
-        12, 16, 14, 19, 11, 17, 13, 20, 15, 18, 10
-      ]
-
-      const rajeshFigures = names.map((state, index) => {
-        const normalized = state.toLowerCase()
-
-        const isAndhra = normalized.includes("andhra")
-        const isTelangana =
-          normalized.includes("telangana")
-
-        const highValue = isAndhra
-          ? 68
-          : isTelangana
-            ? 57
-            : null
-
-        const smaller =
-          smallerValues[index % smallerValues.length]
-
-        return {
-          state,
-          requirements: highValue ?? smaller,
-          placements:
-            highValue ??
-            smallerValues[
-              (index + 3) % smallerValues.length
-            ]
-        }
-      })
-
-      setStateSummary(rajeshFigures)
+      setStateSummary(RAJESH_STATE_FIGURES)
     } else {
       setStateSummary(actualStateSummary)
     }
@@ -493,6 +463,7 @@ export default function Dashboard() {
         <h4 style={{ margin: 0, color: "#64748b" }}>
           {title}
         </h4>
+
         <h2 style={{ marginTop: "10px", color }}>
           {value}
         </h2>
@@ -657,10 +628,14 @@ export default function Dashboard() {
                 }}
               >
                 <span
-                  style={{ color: "#64748b", fontSize: "13px" }}
+                  style={{
+                    color: "#64748b",
+                    fontSize: "13px"
+                  }}
                 >
                   Open Requirements
                 </span>
+
                 <span
                   style={{
                     background: "#dbeafe",
@@ -685,10 +660,14 @@ export default function Dashboard() {
                 }}
               >
                 <span
-                  style={{ color: "#64748b", fontSize: "13px" }}
+                  style={{
+                    color: "#64748b",
+                    fontSize: "13px"
+                  }}
                 >
                   Placements
                 </span>
+
                 <span
                   style={{
                     background: "#dcfce7",
@@ -762,6 +741,7 @@ export default function Dashboard() {
               }}
             >
               <h4>Demand vs Supply by Specialty</h4>
+
               {specialtyChart.datasets?.length > 0 && (
                 <Bar data={specialtyChart} />
               )}
@@ -777,6 +757,7 @@ export default function Dashboard() {
               }}
             >
               <h4>Top Hiring Hospitals</h4>
+
               {hospitalChart.datasets?.length > 0 && (
                 <Bar data={hospitalChart} />
               )}
