@@ -13,45 +13,60 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  function login() {
-    setError("")
+  
+async function login() {
+  setError("")
 
-    const user = USERS.find(
-      (u) =>
-        u.username === username.trim() &&
-        u.password === password
-    )
+  const user = USERS.find(
+    (u) =>
+      u.username.trim().toLowerCase() ===
+        username.trim().toLowerCase() &&
+      u.password === password
+  )
 
-    if (!user) {
-      setError("Invalid username or password")
+  if (!user) {
+    setError("Invalid username or password")
+    return
+  }
+
+  try {
+    // Establish the server-side session required by Hospital Outreach.
+    const response = await fetch("/api/outreach/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        username: user.username,
+        password: user.password
+      })
+    })
+
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      setError(
+        result.error ||
+        "Unable to establish server session. Please try again."
+      )
       return
     }
 
-    try {
-      // Save the logged-in user
-      localStorage.setItem(
-        "medpact_user",
-        JSON.stringify(user)
-      )
+    // Preserve the existing dashboard login session.
+    localStorage.setItem("medpact_user", JSON.stringify(user))
+    localStorage.setItem(
+      "medpact_login_time",
+      String(Date.now())
+    )
 
-      // Start the 10-hour session
-      localStorage.setItem(
-        "medpact_login_time",
-        String(Date.now())
-      )
-
-      setLoading(true)
-
-      // Return to the dashboard
-      router.push("/")
-      router.refresh()
-    } catch (err) {
-      localStorage.removeItem("medpact_user")
-      localStorage.removeItem("medpact_login_time")
-      setError("Unable to save login. Please try again.")
-      setLoading(false)
-    }
+    router.push("/")
+    router.refresh()
+  } catch (error) {
+    setError("Unable to connect to the server. Please try again.")
   }
+}
+
 
   return (
     <div
