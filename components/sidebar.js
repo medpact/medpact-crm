@@ -38,7 +38,7 @@ const menu=[
 {label:"Requirements",href:"/requirements",icon:"📋"},
 {label:"Pipeline",href:"/shortlists",icon:"🎯"},
 {label:"Placements",href:"/placements",icon:"✅"},
-{label:"Rejected Docs",href:"/rejected-doctors"},
+{label:"Rejected Docs",href:"/rejected-doctors",icon:"👨‍⚕️"},
 {label:"Generate Poster",href:"/requirements/poster",icon:"🎨"},
 {label:"Targets",href:"/monthly-incentives",icon:"✅"},
 {label:"Outreach",href:"/dashboard/hospital-outreach",icon:"🏥"},
