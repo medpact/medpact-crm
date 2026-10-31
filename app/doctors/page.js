@@ -28,6 +28,7 @@ export default function DoctorsPage() {
     fetchDoctors()
   }, [search, specialty, city, availability, page])
 
+  // FORMAT DATE
   function formatDate(date) {
     if (!date) return ""
 
@@ -39,16 +40,24 @@ export default function DoctorsPage() {
     return `${day}/${month}/${year}`
   }
 
+  // LOAD SPECIALTIES
   async function fetchSpecialties() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("specialties")
       .select("*")
       .order("name")
 
+    if (error) {
+      console.error("Error loading specialties:", error)
+      return
+    }
+
     setSpecialties(data || [])
   }
 
+  // LOAD DOCTORS
   async function fetchDoctors() {
+
     let query = supabase
       .from("doctors")
       .select(`
@@ -87,7 +96,7 @@ export default function DoctorsPage() {
     const { data, count, error } = await query
 
     if (error) {
-      console.error("Could not load doctors:", error)
+      console.error("Error loading doctors:", error)
       return
     }
 
@@ -95,46 +104,56 @@ export default function DoctorsPage() {
     setTotal(count || 0)
   }
 
-  // Identify registration source
- function getSource(source) {
-  const value = String(source || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "")
+  // IDENTIFY REGISTRATION SOURCE
+  // Direct entries intentionally return null (no symbol).
+  function getSource(source) {
 
-  if (
-    value === "medpactwebsite" ||
-    value === "website" ||
-    value === "medpact"
-  ) {
-    return {
-      symbol: "W",
-      label: "Medpact Website",
-      color: "#1d4ed8",
-      background: "#dbeafe"
+    const value = String(source || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, "")
+
+    // Medpact Website
+    if (
+      value === "medpactwebsite" ||
+      value === "website" ||
+      value === "medpact"
+    ) {
+      return {
+        symbol: "W",
+        label: "Medpact Website",
+        color: "#1d4ed8",
+        background: "#dbeafe"
+      }
     }
-  }
 
-  if (
-    value === "googleform" ||
-    value === "googleforms" ||
-    value === "google"
-  ) {
-    return {
-      symbol: "G",
-      label: "Google Forms",
-      color: "#166534",
-      background: "#dcfce7"
+    // Google Forms
+    if (
+      value === "googleform" ||
+      value === "googleforms" ||
+      value === "google"
+    ) {
+      return {
+        symbol: "G",
+        label: "Google Forms",
+        color: "#166534",
+        background: "#dcfce7"
+      }
     }
-  }
 
-  return null
-}
+    // Direct employee entry or unknown source:
+    // Do not display any symbol.
+    return null
+  }
 
   const totalPages = Math.ceil(total / pageSize)
 
   return (
-    <div style={{ padding: "30px", color: "#0f172a" }}>
+
+    <div style={{
+      padding: "30px",
+      color: "#0f172a"
+    }}>
 
       {/* HEADER */}
 
@@ -153,7 +172,8 @@ export default function DoctorsPage() {
             background: "#2563eb",
             color: "#fff",
             border: "none",
-            borderRadius: "6px"
+            borderRadius: "6px",
+            cursor: "pointer"
           }}>
             + Add Doctor
           </button>
@@ -167,44 +187,62 @@ export default function DoctorsPage() {
         display: "flex",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: "16px",
+        gap: "18px",
         padding: "12px 15px",
         background: "#f8fafc",
         border: "1px solid #e2e8f0",
         borderRadius: "8px",
-        marginBottom: "18px",
+        marginBottom: "20px",
         fontSize: "12px"
       }}>
 
         <strong>Registration Source:</strong>
 
-        {[
-          { symbol: "D", label: "Direct Entry", color: "#92400e", background: "#fef3c7" },
-          { symbol: "G", label: "Google Forms", color: "#166534", background: "#dcfce7" },
-          { symbol: "W", label: "Medpact Website", color: "#1d4ed8", background: "#dbeafe" }
-        ].map(item => (
-          <div key={item.symbol} style={{
-            display: "flex",
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px"
+        }}>
+          <span style={{
+            display: "inline-flex",
             alignItems: "center",
-            gap: "6px"
+            justifyContent: "center",
+            width: "19px",
+            height: "19px",
+            borderRadius: "50%",
+            background: "#dcfce7",
+            color: "#166534",
+            fontWeight: "800"
           }}>
-            <span style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "19px",
-              height: "19px",
-              borderRadius: "50%",
-              background: item.background,
-              color: item.color,
-              fontWeight: "800",
-              fontSize: "11px"
-            }}>
-              {item.symbol}
-            </span>
-            {item.label}
-          </div>
-        ))}
+            G
+          </span>
+          Google Forms
+        </div>
+
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px"
+        }}>
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "19px",
+            height: "19px",
+            borderRadius: "50%",
+            background: "#dbeafe",
+            color: "#1d4ed8",
+            fontWeight: "800"
+          }}>
+            W
+          </span>
+          Medpact Website
+        </div>
+
+        <span style={{ color: "#64748b" }}>
+          No symbol = Direct Entry
+        </span>
 
       </div>
 
@@ -321,9 +359,11 @@ export default function DoctorsPage() {
           <tbody>
 
             {doctors.map(d => {
+
               const source = getSource(d.source)
 
               return (
+
                 <tr
                   key={d.id}
                   style={{ borderTop: "1px solid #eee" }}
@@ -331,37 +371,43 @@ export default function DoctorsPage() {
 
                   <td>{formatDate(d.created_at)}</td>
 
+                  {/* DOCTOR NAME AND SOURCE */}
+
                   <td>
                     <div style={{
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "flex-start",
                       gap: "5px"
                     }}>
 
-                      <span style={{ fontWeight: "600" }}>
+                      <span style={{
+                        fontWeight: "600"
+                      }}>
                         {d.name}
                       </span>
 
-                      <span
-                        title={source.label}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: "17px",
-                          height: "17px",
-                          borderRadius: "50%",
-                          background: source.background,
-                          color: source.color,
-                          fontSize: "10px",
-                          fontWeight: "800",
-                          cursor: "help",
-                          marginTop: "-4px",
-                          flexShrink: 0
-                        }}
-                      >
-                        {source.symbol}
-                      </span>
+                      {source && (
+                        <span
+                          title={source.label}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "17px",
+                            height: "17px",
+                            borderRadius: "50%",
+                            background: source.background,
+                            color: source.color,
+                            fontSize: "10px",
+                            fontWeight: "800",
+                            cursor: "help",
+                            marginTop: "-5px",
+                            flexShrink: 0
+                          }}
+                        >
+                          {source.symbol}
+                        </span>
+                      )}
 
                     </div>
                   </td>
@@ -386,6 +432,7 @@ export default function DoctorsPage() {
                   <td>{d.phone}</td>
 
                   <td>
+
                     <a
                       href={`https://wa.me/91${d.phone}`}
                       target="_blank"
@@ -399,9 +446,11 @@ export default function DoctorsPage() {
                     <Link href={`/doctors/${d.id}`}>
                       👁
                     </Link>
+
                   </td>
 
                 </tr>
+
               )
             })}
 
@@ -436,9 +485,11 @@ export default function DoctorsPage() {
       }}>
 
         {Array.from({ length: totalPages }).map((_, i) => {
+
           const p = i + 1
 
           return (
+
             <button
               key={p}
               onClick={() => setPage(p)}
@@ -447,12 +498,15 @@ export default function DoctorsPage() {
                 border: "1px solid #ddd",
                 borderRadius: "6px",
                 background: page === p ? "#2563eb" : "#fff",
-                color: page === p ? "#fff" : "#000"
+                color: page === p ? "#fff" : "#000",
+                cursor: "pointer"
               }}
             >
               {p}
             </button>
+
           )
+
         })}
 
       </div>
