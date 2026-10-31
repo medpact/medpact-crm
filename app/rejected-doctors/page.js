@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import Link from "next/link"
 
@@ -37,12 +37,10 @@ export default function RejectedDoctorsPage() {
           id,
           name,
           qualification,
-          experience_years,
           phone,
           email,
           city,
           preferred_location,
-          expected_ctc,
           availability_status,
           specialties(name)
         ),
@@ -88,6 +86,8 @@ export default function RejectedDoctorsPage() {
     return String(value || "").toLowerCase().trim()
   }
 
+  // SPECIALTIES
+
   const specialties = useMemo(() => {
 
     return [...new Set(
@@ -97,6 +97,8 @@ export default function RejectedDoctorsPage() {
     )].sort()
 
   }, [records])
+
+  // CITIES
 
   const cities = useMemo(() => {
 
@@ -135,7 +137,7 @@ export default function RejectedDoctorsPage() {
 
   }, [records])
 
-  // FILTER GROUPED DOCTORS
+  // FILTER DOCTORS
 
   const filteredDoctors = useMemo(() => {
 
@@ -185,7 +187,7 @@ export default function RejectedDoctorsPage() {
 
   }, [groupedDoctors, search, specialty, city, availability])
 
-  // SUMMARY COUNTS - UNIQUE DOCTORS
+  // SUMMARY COUNTS
 
   const availableCount = groupedDoctors.filter(
     group => group.doctor?.availability_status === "available"
@@ -226,6 +228,8 @@ export default function RejectedDoctorsPage() {
 
     }
   }
+
+  // WHATSAPP LINK
 
   function getWhatsAppLink(phone) {
 
@@ -339,6 +343,7 @@ export default function RejectedDoctorsPage() {
           <div style={{ color: "#64748b", fontSize: "13px" }}>
             Total Rejection Records
           </div>
+
           <div style={{
             fontSize: "28px",
             fontWeight: "700",
@@ -352,6 +357,7 @@ export default function RejectedDoctorsPage() {
           <div style={{ color: "#64748b", fontSize: "13px" }}>
             Unique Doctors
           </div>
+
           <div style={{
             fontSize: "28px",
             fontWeight: "700",
@@ -365,6 +371,7 @@ export default function RejectedDoctorsPage() {
           <div style={{ color: "#64748b", fontSize: "13px" }}>
             Available Doctors
           </div>
+
           <div style={{
             fontSize: "28px",
             fontWeight: "700",
@@ -379,6 +386,7 @@ export default function RejectedDoctorsPage() {
           <div style={{ color: "#64748b", fontSize: "13px" }}>
             Not Available
           </div>
+
           <div style={{
             fontSize: "28px",
             fontWeight: "700",
@@ -473,7 +481,7 @@ export default function RejectedDoctorsPage() {
             )} rejection record(s)`}
       </div>
 
-      {/* TABLE */}
+      {/* MAIN TABLE */}
 
       <div style={{
         background: "#fff",
@@ -486,7 +494,7 @@ export default function RejectedDoctorsPage() {
           width="100%"
           cellPadding="11"
           style={{
-            minWidth: "950px",
+            minWidth: "1050px",
             borderCollapse: "collapse",
             fontSize: "13px"
           }}
@@ -502,6 +510,7 @@ export default function RejectedDoctorsPage() {
               <th>Qualification</th>
               <th>No. of Rejections</th>
               <th>Rejected By</th>
+              <th>Rejection Reason</th>
               <th>Availability</th>
               <th>Contact</th>
               <th>Actions</th>
@@ -514,7 +523,7 @@ export default function RejectedDoctorsPage() {
 
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   style={{
                     textAlign: "center",
                     padding: "35px",
@@ -537,20 +546,17 @@ export default function RejectedDoctorsPage() {
 
               const whatsappLink = getWhatsAppLink(doctor.phone)
 
-              const hospitalNames = [
-                ...new Set(
-                  rejections.map(row =>
-                    row.requirements?.hospitals?.hospital_name || "Unknown hospital"
-                  )
-                )
-              ]
+              const singleRejection = rejections[0]
+
+              const singleHospital =
+                singleRejection?.requirements?.hospitals?.hospital_name ||
+                "Unknown hospital"
 
               return (
 
-                <>
+                <Fragment key={group.doctorId}>
 
                   <tr
-                    key={group.doctorId}
                     style={{
                       borderTop: "1px solid #e5e7eb",
                       background: isExpanded ? "#f8fafc" : "#fff",
@@ -558,7 +564,7 @@ export default function RejectedDoctorsPage() {
                     }}
                   >
 
-                    <td style={{ minWidth: "150px" }}>
+                    <td style={{ minWidth: "145px" }}>
                       <Link
                         href={`/doctors/${doctor.id}`}
                         style={{
@@ -592,6 +598,8 @@ export default function RejectedDoctorsPage() {
                       </span>
                     </td>
 
+                    {/* REJECTED BY */}
+
                     <td style={{
                       minWidth: "170px",
                       fontWeight: "600"
@@ -599,7 +607,7 @@ export default function RejectedDoctorsPage() {
 
                       {rejectionCount === 1 ? (
 
-                        hospitalNames[0]
+                        singleHospital
 
                       ) : (
 
@@ -616,7 +624,7 @@ export default function RejectedDoctorsPage() {
                             padding: "4px 0"
                           }}
                         >
-                          {hospitalNames.length} hospitals
+                          View {rejectionCount} rejections
                           <span style={{ marginLeft: "7px" }}>
                             {isExpanded ? "▲" : "▼"}
                           </span>
@@ -625,6 +633,25 @@ export default function RejectedDoctorsPage() {
                       )}
 
                     </td>
+
+                    {/* REJECTION REASON */}
+
+                    <td style={{
+                      minWidth: "190px",
+                      maxWidth: "280px",
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere"
+                    }}>
+
+                      {rejectionCount === 1
+                        ? singleRejection?.remarks || "—"
+                        : isExpanded
+                          ? "See rejection history below"
+                          : "Expand to view reasons"}
+
+                    </td>
+
+                    {/* AVAILABILITY */}
 
                     <td>
                       <span style={{
@@ -646,9 +673,13 @@ export default function RejectedDoctorsPage() {
                       </span>
                     </td>
 
+                    {/* CONTACT */}
+
                     <td style={{ whiteSpace: "nowrap" }}>
                       {doctor.phone || "—"}
                     </td>
+
+                    {/* ACTIONS */}
 
                     <td style={{ minWidth: "130px" }}>
 
@@ -690,9 +721,9 @@ export default function RejectedDoctorsPage() {
 
                   {rejectionCount > 1 && isExpanded && (
 
-                    <tr key={`${group.doctorId}-history`}>
+                    <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         style={{
                           background: "#f8fafc",
                           padding: "15px 25px 20px 45px"
@@ -772,7 +803,7 @@ export default function RejectedDoctorsPage() {
 
                   )}
 
-                </>
+                </Fragment>
 
               )
 
@@ -789,8 +820,9 @@ export default function RejectedDoctorsPage() {
         fontSize: "12px",
         color: "#64748b"
       }}>
-        Each doctor appears only once. Expand the rejection history
-        to view individual hospital feedback when there are multiple rejections.
+        Each doctor appears only once. Single rejection details are
+        displayed directly. Expand multiple rejections to view their
+        individual hospital history and feedback.
       </div>
 
     </div>
