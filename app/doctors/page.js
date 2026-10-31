@@ -30,6 +30,7 @@ export default function DoctorsPage() {
 
   // FORMAT DATE
   function formatDate(date) {
+
     if (!date) return ""
 
     const d = new Date(date)
@@ -38,10 +39,12 @@ export default function DoctorsPage() {
     const year = d.getFullYear()
 
     return `${day}/${month}/${year}`
+
   }
 
   // LOAD SPECIALTIES
   async function fetchSpecialties() {
+
     const { data, error } = await supabase
       .from("specialties")
       .select("*")
@@ -53,6 +56,7 @@ export default function DoctorsPage() {
     }
 
     setSpecialties(data || [])
+
   }
 
   // LOAD DOCTORS
@@ -102,48 +106,155 @@ export default function DoctorsPage() {
 
     setDoctors(data || [])
     setTotal(count || 0)
+
   }
 
-  // IDENTIFY REGISTRATION SOURCE
-  // Direct entries intentionally return null (no symbol).
-  function getSource(source) {
+  // NORMALIZE SOURCE FOR DISPLAY
+  // Database values are never modified here.
+  function getSourceDisplay(source) {
 
-    const value = String(source || "")
-      .trim()
+    if (!source || !String(source).trim()) {
+      return null
+    }
+
+    const original = String(source).trim()
+
+    const value = original
       .toLowerCase()
-      .replace(/[\s_-]+/g, "")
+      .replace(/[\s_.-]+/g, "")
 
-    // Medpact Website
-    if (
-      value === "medpactwebsite" ||
-      value === "website" ||
-      value === "medpact"
-    ) {
-      return {
-        symbol: "W",
-        label: "Medpact Website",
-        color: "#1d4ed8",
-        background: "#dbeafe"
-      }
+    // Direct entries: no marker
+    if (value === "direct") {
+      return null
     }
 
     // Google Forms
     if (
+      value === "forms" ||
+      value === "form" ||
       value === "googleform" ||
       value === "googleforms" ||
       value === "google"
     ) {
       return {
-        symbol: "G",
-        label: "Google Forms",
-        color: "#166534",
+        label: "Forms",
+        title: original,
+        color: "#15803d",
         background: "#dcfce7"
       }
     }
 
-    // Direct employee entry or unknown source:
-    // Do not display any symbol.
-    return null
+    // Medpact Website
+    if (
+      value === "website" ||
+      value === "medpactwebsite" ||
+      value === "medpact"
+    ) {
+      return {
+        label: "Website",
+        title: original,
+        color: "#1d4ed8",
+        background: "#dbeafe"
+      }
+    }
+
+    // Naukri and historical Naukri variants
+    if (
+      value === "naukri" ||
+      value === "naukrire sdex".replace(/\s/g, "") ||
+      value === "naukriclassified" ||
+      value === "naukriresdex"
+    ) {
+      return {
+        label: "Naukri",
+        title: original,
+        color: "#7c3aed",
+        background: "#ede9fe"
+      }
+    }
+
+    // Indeed and historical Indeed variants
+    if (
+      value === "indeed" ||
+      value === "indeedcom"
+    ) {
+      return {
+        label: "Indeed",
+        title: original,
+        color: "#0369a1",
+        background: "#e0f2fe"
+      }
+    }
+
+    // LinkedIn
+    if (value === "linkedin") {
+      return {
+        label: "LinkedIn",
+        title: original,
+        color: "#075985",
+        background: "#e0f2fe"
+      }
+    }
+
+    // SMS and Bulk SMS
+    if (
+      value === "sms" ||
+      value === "bulksms"
+    ) {
+      return {
+        label: "SMS",
+        title: original,
+        color: "#b45309",
+        background: "#fef3c7"
+      }
+    }
+
+    // WhatsApp and historical variants
+    if (
+      value === "whatsapp" ||
+      value === "bulkwhatsapp" ||
+      value === "webwhatsapp"
+    ) {
+      return {
+        label: "WhatsApp",
+        title: original,
+        color: "#15803d",
+        background: "#dcfce7"
+      }
+    }
+
+    // Email and Medpact Email
+    if (
+      value === "email" ||
+      value === "medpactemail"
+    ) {
+      return {
+        label: "Email",
+        title: original,
+        color: "#475569",
+        background: "#f1f5f9"
+      }
+    }
+
+    // Referral
+    if (value === "ref" || value === "referral") {
+      return {
+        label: "Ref",
+        title: original,
+        color: "#9a3412",
+        background: "#ffedd5"
+      }
+    }
+
+    // Any other historical value:
+    // Display its first three characters.
+    return {
+      label: original.substring(0, 3),
+      title: original,
+      color: "#475569",
+      background: "#f1f5f9"
+    }
+
   }
 
   const totalPages = Math.ceil(total / pageSize)
@@ -161,7 +272,9 @@ export default function DoctorsPage() {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: "25px"
+        marginBottom: "25px",
+        flexWrap: "wrap",
+        gap: "12px"
       }}>
 
         <h2>Doctors</h2>
@@ -187,7 +300,7 @@ export default function DoctorsPage() {
         display: "flex",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: "18px",
+        gap: "15px",
         padding: "12px 15px",
         background: "#f8fafc",
         border: "1px solid #e2e8f0",
@@ -198,50 +311,41 @@ export default function DoctorsPage() {
 
         <strong>Registration Source:</strong>
 
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "6px"
-        }}>
-          <span style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "19px",
-            height: "19px",
-            borderRadius: "50%",
-            background: "#dcfce7",
-            color: "#166534",
-            fontWeight: "800"
-          }}>
-            G
-          </span>
-          Google Forms
-        </div>
+        {[
+          { label: "Naukri", color: "#7c3aed", background: "#ede9fe" },
+          { label: "Indeed", color: "#0369a1", background: "#e0f2fe" },
+          { label: "LinkedIn", color: "#075985", background: "#e0f2fe" },
+          { label: "SMS", color: "#b45309", background: "#fef3c7" },
+          { label: "WhatsApp", color: "#15803d", background: "#dcfce7" },
+          { label: "Email", color: "#475569", background: "#f1f5f9" },
+          { label: "Ref", color: "#9a3412", background: "#ffedd5" },
+          { label: "Forms", color: "#15803d", background: "#dcfce7" },
+          { label: "Website", color: "#1d4ed8", background: "#dbeafe" }
+        ].map(item => (
 
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "6px"
-        }}>
-          <span style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "19px",
-            height: "19px",
-            borderRadius: "50%",
-            background: "#dbeafe",
-            color: "#1d4ed8",
-            fontWeight: "800"
-          }}>
-            W
+          <span
+            key={item.label}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px"
+            }}
+          >
+            <span style={{
+              fontWeight: "800",
+              color: item.color,
+              background: item.background,
+              padding: "3px 6px",
+              borderRadius: "4px"
+            }}>
+              {item.label}
+            </span>
           </span>
-          Medpact Website
-        </div>
+
+        ))}
 
         <span style={{ color: "#64748b" }}>
-          No symbol = Direct Entry
+          Direct / Blank = No marker
         </span>
 
       </div>
@@ -360,7 +464,7 @@ export default function DoctorsPage() {
 
             {doctors.map(d => {
 
-              const source = getSource(d.source)
+              const source = getSourceDisplay(d.source)
 
               return (
 
@@ -371,45 +475,39 @@ export default function DoctorsPage() {
 
                   <td>{formatDate(d.created_at)}</td>
 
-                  {/* DOCTOR NAME AND SOURCE */}
+                  {/* DOCTOR NAME AND SOURCE SUPERSCRIPT */}
 
                   <td>
-                    <div style={{
-                      display: "inline-flex",
-                      alignItems: "flex-start",
-                      gap: "5px"
+                    <span style={{
+                      fontWeight: "600"
                     }}>
+                      {d.name}
+                    </span>
 
-                      <span style={{
-                        fontWeight: "600"
-                      }}>
-                        {d.name}
-                      </span>
+                    {source && (
 
-                      {source && (
-                        <span
-                          title={source.label}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "17px",
-                            height: "17px",
-                            borderRadius: "50%",
-                            background: source.background,
-                            color: source.color,
-                            fontSize: "10px",
-                            fontWeight: "800",
-                            cursor: "help",
-                            marginTop: "-5px",
-                            flexShrink: 0
-                          }}
-                        >
-                          {source.symbol}
-                        </span>
-                      )}
+                      <sup
+                        title={`Source: ${source.title}`}
+                        style={{
+                          display: "inline",
+                          marginLeft: "4px",
+                          fontSize: "10px",
+                          lineHeight: 1,
+                          fontWeight: "800",
+                          color: source.color,
+                          background: source.background,
+                          padding: "2px 4px",
+                          borderRadius: "3px",
+                          verticalAlign: "super",
+                          whiteSpace: "nowrap",
+                          cursor: "help"
+                        }}
+                      >
+                        {source.label}
+                      </sup>
 
-                    </div>
+                    )}
+
                   </td>
 
                   <td>{d.specialties?.name}</td>
@@ -443,7 +541,10 @@ export default function DoctorsPage() {
                       💬
                     </a>
 
-                    <Link href={`/doctors/${d.id}`}>
+                    <Link
+                      href={`/doctors/${d.id}`}
+                      title="View Doctor"
+                    >
                       👁
                     </Link>
 
@@ -452,9 +553,11 @@ export default function DoctorsPage() {
                 </tr>
 
               )
+
             })}
 
             {doctors.length === 0 && (
+
               <tr>
                 <td
                   colSpan="8"
@@ -467,6 +570,7 @@ export default function DoctorsPage() {
                   No doctors found.
                 </td>
               </tr>
+
             )}
 
           </tbody>
@@ -512,5 +616,7 @@ export default function DoctorsPage() {
       </div>
 
     </div>
+
   )
+
 }
