@@ -13,6 +13,7 @@ export default function RejectedDoctorsPage() {
   const [specialty, setSpecialty] = useState("")
   const [city, setCity] = useState("")
   const [availability, setAvailability] = useState("")
+  const [expanded, setExpanded] = useState(null)
 
   useEffect(() => {
     fetchRejectedDoctors()
@@ -66,7 +67,6 @@ export default function RejectedDoctorsPage() {
     }
 
     setLoading(false)
-
   }
 
   function formatDate(date) {
@@ -82,19 +82,6 @@ export default function RejectedDoctorsPage() {
       month: "short",
       year: "numeric"
     })
-
-  }
-
-  function formatCurrency(amount) {
-
-    if (amount === null || amount === undefined || amount === "") {
-      return "—"
-    }
-
-    return "₹" + Number(amount).toLocaleString("en-IN", {
-      maximumFractionDigits: 2
-    })
-
   }
 
   function normalize(value) {
@@ -121,12 +108,41 @@ export default function RejectedDoctorsPage() {
 
   }, [records])
 
-  const filteredRecords = useMemo(() => {
+  // GROUP REJECTION RECORDS BY DOCTOR
 
-    return records.filter(row => {
+  const groupedDoctors = useMemo(() => {
+
+    const groups = {}
+
+    records.forEach(row => {
 
       const doctor = row.doctors || {}
-      const hospital = row.requirements?.hospitals?.hospital_name || ""
+      const key = row.doctor_id || doctor.id || row.id
+
+      if (!groups[key]) {
+        groups[key] = {
+          doctorId: doctor.id,
+          doctor,
+          rejections: []
+        }
+      }
+
+      groups[key].rejections.push(row)
+
+    })
+
+    return Object.values(groups)
+
+  }, [records])
+
+  // FILTER GROUPED DOCTORS
+
+  const filteredDoctors = useMemo(() => {
+
+    return groupedDoctors.filter(group => {
+
+      const doctor = group.doctor || {}
+
       const doctorSpecialty = doctor.specialties?.name || ""
       const doctorCity = doctor.preferred_location || doctor.city || ""
 
@@ -136,9 +152,17 @@ export default function RejectedDoctorsPage() {
         !term ||
         normalize(doctor.name).includes(term) ||
         normalize(doctor.phone).includes(term) ||
-        normalize(hospital).includes(term) ||
         normalize(doctorSpecialty).includes(term) ||
-        normalize(row.remarks).includes(term)
+        group.rejections.some(row => {
+
+          const hospital =
+            row.requirements?.hospitals?.hospital_name || ""
+
+          return (
+            normalize(hospital).includes(term) ||
+            normalize(row.remarks).includes(term)
+          )
+        })
 
       const matchesSpecialty =
         !specialty || doctorSpecialty === specialty
@@ -159,20 +183,23 @@ export default function RejectedDoctorsPage() {
 
     })
 
-  }, [records, search, specialty, city, availability])
+  }, [groupedDoctors, search, specialty, city, availability])
 
-  const availableCount = records.filter(
-    r => r.doctors?.availability_status === "available"
+  // SUMMARY COUNTS - UNIQUE DOCTORS
+
+  const availableCount = groupedDoctors.filter(
+    group => group.doctor?.availability_status === "available"
   ).length
 
-  const unavailableCount = records.filter(
-    r => r.doctors?.availability_status === "not_available"
+  const unavailableCount = groupedDoctors.filter(
+    group => group.doctor?.availability_status === "not_available"
   ).length
 
-  async function copyDoctorProfile(row) {
+  // COPY DOCTOR PROFILE
 
-    const doctor = row.doctors || {}
-    const hospital = row.requirements?.hospitals?.hospital_name || "Unknown hospital"
+  async function copyDoctorProfile(group) {
+
+    const doctor = group.doctor || {}
 
     const profile = [
       "MEDPACT - DOCTOR PROFILE",
@@ -180,18 +207,9 @@ export default function RejectedDoctorsPage() {
       `Name: ${doctor.name || "—"}`,
       `Qualification: ${doctor.qualification || "—"}`,
       `Specialty: ${doctor.specialties?.name || "—"}`,
-      `Experience: ${doctor.experience_years ?? "—"} years`,
-      `Current City: ${doctor.city || "—"}`,
-      `Preferred Location: ${doctor.preferred_location || "—"}`,
-      `Expected CTC: ${formatCurrency(doctor.expected_ctc)}`,
       `Phone: ${doctor.phone || "—"}`,
       `Email: ${doctor.email || "—"}`,
       `Availability: ${doctor.availability_status || "—"}`,
-      "",
-      "Previous Recruitment History",
-      `Previously rejected by: ${hospital}`,
-      `Rejection date: ${formatDate(row.rejected_at)}`,
-      `Rejection remarks: ${row.remarks || "—"}`,
       "",
       "Shared through Medpact"
     ].join("\n")
@@ -207,7 +225,6 @@ export default function RejectedDoctorsPage() {
       alert("Unable to copy profile. Please try again.")
 
     }
-
   }
 
   function getWhatsAppLink(phone) {
@@ -220,7 +237,6 @@ export default function RejectedDoctorsPage() {
       number.length === 10 ? "91" + number : number
 
     return `https://wa.me/${formattedNumber}`
-
   }
 
   const cardStyle = {
@@ -334,6 +350,19 @@ export default function RejectedDoctorsPage() {
 
         <div style={cardStyle}>
           <div style={{ color: "#64748b", fontSize: "13px" }}>
+            Unique Doctors
+          </div>
+          <div style={{
+            fontSize: "28px",
+            fontWeight: "700",
+            marginTop: "7px"
+          }}>
+            {groupedDoctors.length}
+          </div>
+        </div>
+
+        <div style={cardStyle}>
+          <div style={{ color: "#64748b", fontSize: "13px" }}>
             Available Doctors
           </div>
           <div style={{
@@ -374,7 +403,10 @@ export default function RejectedDoctorsPage() {
         <input
           placeholder="Search doctor, hospital, phone, remarks..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => {
+            setSearch(e.target.value)
+            setExpanded(null)
+          }}
           style={{
             ...inputStyle,
             flex: "1 1 250px"
@@ -383,7 +415,10 @@ export default function RejectedDoctorsPage() {
 
         <select
           value={specialty}
-          onChange={e => setSpecialty(e.target.value)}
+          onChange={e => {
+            setSpecialty(e.target.value)
+            setExpanded(null)
+          }}
           style={inputStyle}
         >
           <option value="">All Specialties</option>
@@ -396,7 +431,10 @@ export default function RejectedDoctorsPage() {
 
         <select
           value={city}
-          onChange={e => setCity(e.target.value)}
+          onChange={e => {
+            setCity(e.target.value)
+            setExpanded(null)
+          }}
           style={inputStyle}
         >
           <option value="">All Cities</option>
@@ -409,7 +447,10 @@ export default function RejectedDoctorsPage() {
 
         <select
           value={availability}
-          onChange={e => setAvailability(e.target.value)}
+          onChange={e => {
+            setAvailability(e.target.value)
+            setExpanded(null)
+          }}
           style={inputStyle}
         >
           <option value="">All Availability</option>
@@ -427,7 +468,9 @@ export default function RejectedDoctorsPage() {
       }}>
         {loading
           ? "Loading rejected doctors..."
-          : `Showing ${filteredRecords.length} rejection record(s)`}
+          : `Showing ${filteredDoctors.length} doctor(s) with ${filteredDoctors.reduce(
+              (total, group) => total + group.rejections.length, 0
+            )} rejection record(s)`}
       </div>
 
       {/* TABLE */}
@@ -443,7 +486,7 @@ export default function RejectedDoctorsPage() {
           width="100%"
           cellPadding="11"
           style={{
-            minWidth: "1350px",
+            minWidth: "950px",
             borderCollapse: "collapse",
             fontSize: "13px"
           }}
@@ -457,12 +500,8 @@ export default function RejectedDoctorsPage() {
               <th>Doctor</th>
               <th>Specialty</th>
               <th>Qualification</th>
-              <th>Experience</th>
-              <th>Location</th>
-              <th>Expected CTC</th>
+              <th>No. of Rejections</th>
               <th>Rejected By</th>
-              <th>Rejection Date</th>
-              <th>Rejection Remarks</th>
               <th>Availability</th>
               <th>Contact</th>
               <th>Actions</th>
@@ -471,11 +510,11 @@ export default function RejectedDoctorsPage() {
 
           <tbody>
 
-            {!loading && filteredRecords.length === 0 && (
+            {!loading && filteredDoctors.length === 0 && (
 
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={8}
                   style={{
                     textAlign: "center",
                     padding: "35px",
@@ -488,145 +527,252 @@ export default function RejectedDoctorsPage() {
 
             )}
 
-            {filteredRecords.map(row => {
+            {filteredDoctors.map(group => {
 
-              const doctor = row.doctors || {}
-              const hospital =
-                row.requirements?.hospitals?.hospital_name || "—"
+              const doctor = group.doctor || {}
+              const rejections = group.rejections
+              const rejectionCount = rejections.length
+
+              const isExpanded = expanded === group.doctorId
 
               const whatsappLink = getWhatsAppLink(doctor.phone)
 
+              const hospitalNames = [
+                ...new Set(
+                  rejections.map(row =>
+                    row.requirements?.hospitals?.hospital_name || "Unknown hospital"
+                  )
+                )
+              ]
+
               return (
 
-                <tr
-                  key={row.id}
-                  style={{
-                    borderTop: "1px solid #e5e7eb",
-                    verticalAlign: "top"
-                  }}
-                >
+                <>
 
-                  <td style={{ minWidth: "150px" }}>
-                    <Link
-                      href={`/doctors/${doctor.id}`}
-                      style={{
-                        color: "#2563eb",
-                        fontWeight: "700",
-                        textDecoration: "none"
-                      }}
-                    >
-                      {doctor.name || "Unknown Doctor"}
-                    </Link>
-                  </td>
+                  <tr
+                    key={group.doctorId}
+                    style={{
+                      borderTop: "1px solid #e5e7eb",
+                      background: isExpanded ? "#f8fafc" : "#fff",
+                      verticalAlign: "middle"
+                    }}
+                  >
 
-                  <td>
-                    {doctor.specialties?.name || "—"}
-                  </td>
-
-                  <td>
-                    {doctor.qualification || "—"}
-                  </td>
-
-                  <td>
-                    {doctor.experience_years != null
-                      ? `${doctor.experience_years} yrs`
-                      : "—"}
-                  </td>
-
-                  <td style={{ minWidth: "130px" }}>
-                    {doctor.city || "—"}
-                    <div style={{
-                      color: "#64748b",
-                      fontSize: "11px",
-                      marginTop: "4px"
-                    }}>
-                      Preferred: {doctor.preferred_location || "—"}
-                    </div>
-                  </td>
-
-                  <td>
-                    {formatCurrency(doctor.expected_ctc)}
-                  </td>
-
-                  <td style={{
-                    minWidth: "150px",
-                    fontWeight: "600"
-                  }}>
-                    {hospital}
-                  </td>
-
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    {formatDate(row.rejected_at)}
-                  </td>
-
-                  <td style={{
-                    minWidth: "200px",
-                    maxWidth: "280px",
-                    whiteSpace: "pre-wrap",
-                    overflowWrap: "anywhere"
-                  }}>
-                    {row.remarks || "—"}
-                  </td>
-
-                  <td>
-                    <span style={{
-                      display: "inline-block",
-                      padding: "4px 8px",
-                      borderRadius: "20px",
-                      fontSize: "11px",
-                      whiteSpace: "nowrap",
-                      background:
-                        doctor.availability_status === "available"
-                          ? "#dcfce7"
-                          : "#f1f5f9",
-                      color:
-                        doctor.availability_status === "available"
-                          ? "#166534"
-                          : "#475569"
-                    }}>
-                      {doctor.availability_status || "Unknown"}
-                    </span>
-                  </td>
-
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    {doctor.phone || "—"}
-                  </td>
-
-                  <td style={{ minWidth: "145px" }}>
-
-                    {whatsappLink && (
-                      <a
-                        href={whatsappLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Contact doctor on WhatsApp"
+                    <td style={{ minWidth: "150px" }}>
+                      <Link
+                        href={`/doctors/${doctor.id}`}
                         style={{
-                          marginRight: "10px",
+                          color: "#2563eb",
+                          fontWeight: "700",
                           textDecoration: "none"
                         }}
                       >
-                        💬
-                      </a>
-                    )}
+                        {doctor.name || "Unknown Doctor"}
+                      </Link>
+                    </td>
 
-                    <button
-                      onClick={() => copyDoctorProfile(row)}
-                      title="Copy doctor profile"
-                      style={{
-                        border: "1px solid #d1d5db",
-                        background: "#fff",
-                        borderRadius: "5px",
-                        padding: "5px 8px",
-                        cursor: "pointer",
-                        fontSize: "12px"
-                      }}
-                    >
-                      Copy Profile
-                    </button>
+                    <td>
+                      {doctor.specialties?.name || "—"}
+                    </td>
 
-                  </td>
+                    <td>
+                      {doctor.qualification || "—"}
+                    </td>
 
-                </tr>
+                    <td>
+                      <span style={{
+                        display: "inline-block",
+                        background: rejectionCount > 1 ? "#fef3c7" : "#f1f5f9",
+                        color: rejectionCount > 1 ? "#92400e" : "#475569",
+                        padding: "4px 10px",
+                        borderRadius: "20px",
+                        fontWeight: "700"
+                      }}>
+                        {rejectionCount}
+                      </span>
+                    </td>
+
+                    <td style={{
+                      minWidth: "170px",
+                      fontWeight: "600"
+                    }}>
+
+                      {rejectionCount === 1 ? (
+
+                        hospitalNames[0]
+
+                      ) : (
+
+                        <button
+                          onClick={() =>
+                            setExpanded(isExpanded ? null : group.doctorId)
+                          }
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            color: "#2563eb",
+                            cursor: "pointer",
+                            fontWeight: "600",
+                            padding: "4px 0"
+                          }}
+                        >
+                          {hospitalNames.length} hospitals
+                          <span style={{ marginLeft: "7px" }}>
+                            {isExpanded ? "▲" : "▼"}
+                          </span>
+                        </button>
+
+                      )}
+
+                    </td>
+
+                    <td>
+                      <span style={{
+                        display: "inline-block",
+                        padding: "4px 8px",
+                        borderRadius: "20px",
+                        fontSize: "11px",
+                        whiteSpace: "nowrap",
+                        background:
+                          doctor.availability_status === "available"
+                            ? "#dcfce7"
+                            : "#f1f5f9",
+                        color:
+                          doctor.availability_status === "available"
+                            ? "#166534"
+                            : "#475569"
+                      }}>
+                        {doctor.availability_status || "Unknown"}
+                      </span>
+                    </td>
+
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {doctor.phone || "—"}
+                    </td>
+
+                    <td style={{ minWidth: "130px" }}>
+
+                      {whatsappLink && (
+                        <a
+                          href={whatsappLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Contact doctor on WhatsApp"
+                          style={{
+                            marginRight: "10px",
+                            textDecoration: "none"
+                          }}
+                        >
+                          💬
+                        </a>
+                      )}
+
+                      <button
+                        onClick={() => copyDoctorProfile(group)}
+                        title="Copy doctor profile"
+                        style={{
+                          border: "1px solid #d1d5db",
+                          background: "#fff",
+                          borderRadius: "5px",
+                          padding: "5px 8px",
+                          cursor: "pointer",
+                          fontSize: "12px"
+                        }}
+                      >
+                        Copy Profile
+                      </button>
+
+                    </td>
+
+                  </tr>
+
+                  {/* EXPANDED REJECTION HISTORY */}
+
+                  {rejectionCount > 1 && isExpanded && (
+
+                    <tr key={`${group.doctorId}-history`}>
+                      <td
+                        colSpan={8}
+                        style={{
+                          background: "#f8fafc",
+                          padding: "15px 25px 20px 45px"
+                        }}
+                      >
+
+                        <div style={{
+                          fontWeight: "700",
+                          marginBottom: "10px",
+                          color: "#334155"
+                        }}>
+                          Rejection History — {doctor.name}
+                        </div>
+
+                        <table
+                          width="100%"
+                          cellPadding="10"
+                          style={{
+                            borderCollapse: "collapse",
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            fontSize: "12px"
+                          }}
+                        >
+
+                          <thead style={{
+                            background: "#f1f5f9",
+                            textAlign: "left"
+                          }}>
+                            <tr>
+                              <th>Hospital</th>
+                              <th>Rejection Date</th>
+                              <th>Rejection Remarks</th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+
+                            {rejections.map(row => (
+
+                              <tr
+                                key={row.id}
+                                style={{
+                                  borderTop: "1px solid #e5e7eb",
+                                  verticalAlign: "top"
+                                }}
+                              >
+
+                                <td style={{
+                                  fontWeight: "600",
+                                  minWidth: "180px"
+                                }}>
+                                  {row.requirements?.hospitals?.hospital_name || "Unknown hospital"}
+                                </td>
+
+                                <td style={{ whiteSpace: "nowrap" }}>
+                                  {formatDate(row.rejected_at)}
+                                </td>
+
+                                <td style={{
+                                  whiteSpace: "pre-wrap",
+                                  overflowWrap: "anywhere"
+                                }}>
+                                  {row.remarks || "—"}
+                                </td>
+
+                              </tr>
+
+                            ))}
+
+                          </tbody>
+
+                        </table>
+
+                      </td>
+                    </tr>
+
+                  )}
+
+                </>
 
               )
 
@@ -643,12 +789,11 @@ export default function RejectedDoctorsPage() {
         fontSize: "12px",
         color: "#64748b"
       }}>
-        Each row represents one rejected hospital recruitment record.
-        A doctor rejected by multiple hospitals may appear more than once.
+        Each doctor appears only once. Expand the rejection history
+        to view individual hospital feedback when there are multiple rejections.
       </div>
 
     </div>
 
   )
-
 }
